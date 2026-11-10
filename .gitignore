@@ -1,0 +1,8 @@
+.venv/
+third_party/
+dracoconv/bin/
+__pycache__/
+*.part
+.superpowers/
+*.egg-info/
+.pytest_cache/
