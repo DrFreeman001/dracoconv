@@ -4,18 +4,20 @@ from __future__ import annotations
 import errno
 import os
 import time
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from .engine import EngineError, decoder, select_engine
 from .engine.base import prepare
-from .io import LOSSY_KINDS, FileKind, detect_kind, mesh_from_bytes, mesh_to_bytes
+from .io import LOSSY_KINDS, MODEL_KINDS, FileKind, detect_kind, detect_kind_from_bytes, mesh_from_bytes, mesh_to_bytes
+from .io.archive import EncryptedZipError, rewrite_zip
 from .io.paths import long_path
 from .io.sniff import kind_from_name
 from .mesh import Mesh, MeshReadError
 from .quality import QualityReport, error_bound_mm, float_floor_mm, measure
-from .settings import EncodeSettings, resolve_bits
+from .settings import EncodeSettings
 
 State = Literal["done", "skipped", "failed"]
 #: Raisons qui écartent un fichier sans que ce soit une erreur.
@@ -245,5 +247,83 @@ def decode_file(src: Path, dst: Path, fmt: Literal["stl", "obj", "ply"]) -> File
         return _failure(src, exc, size_before, started)
 
 
-def resolved_bits_for(mesh: Mesh, settings: EncodeSettings) -> int:
-    return resolve_bits(settings, mesh.max_extent())
+def zip_output_path(src: Path, tag: str, dest_dir: Path, taken: set[Path]) -> Path:
+    """``pack.zip`` -> ``pack.<tag>.zip`` ; ``pack.drc.zip`` -> ``pack.<tag>.zip``."""
+    src, dest_dir = Path(src), Path(dest_dir)
+    stem = src.stem
+    if Path(stem).suffix.lower() in _MODEL_SUFFIXES | {".drc"}:
+        stem = Path(stem).stem
+    counter = 0
+    while True:
+        name = f"{stem}.{tag}.zip" if counter == 0 else f"{stem} ({counter}).{tag}.zip"
+        candidate = dest_dir / name
+        if candidate not in taken and not _exists(candidate):
+            taken.add(candidate)
+            return candidate
+        counter += 1
+
+
+def _swap_suffix(name: str, new_suffix: str) -> str:
+    """Nom d'une entrée d'archive après conversion : a/m.stl -> a/m.drc ; a/m.stl.drc -> a/m.stl."""
+    folder, _, base = name.rpartition("/")
+    stem = base.rsplit(".", 1)[0]
+    if new_suffix != ".drc" and "." in stem and "." + stem.rsplit(".", 1)[1].lower() in _MODEL_SUFFIXES:
+        stem = stem.rsplit(".", 1)[0]
+    return (folder + "/" if folder else "") + stem + new_suffix
+
+
+def _convert_zip(src: Path, dst: Path, transform, started: float, lossy: list) -> FileResult:
+    size_before = 0
+    try:
+        stat = os.stat(long_path(src))
+        size_before = stat.st_size
+        report = rewrite_zip(src, dst, transform)
+        if report.converted == 0:
+            return _result(src, None, "skipped", "no_gain", size_before, started)
+        os.utime(long_path(dst), (stat.st_mtime, stat.st_mtime))
+        note = ", ".join(f"{name}: {reason}" for name, reason in report.skipped.items()) or None
+        return _result(src, dst, "done", None, size_before, started, size_after=os.stat(long_path(dst)).st_size,
+                       lossy_source=bool(lossy), note=note)
+    except EncryptedZipError:
+        return _result(src, None, "skipped", "encrypted_zip", size_before, started)
+    except (zipfile.BadZipFile, NotImplementedError):
+        return _result(src, None, "failed", "unreadable", size_before, started)
+    except (OSError, MemoryError) as exc:
+        return _failure(src, exc, size_before, started)
+
+
+def encode_zip(src: Path, dst: Path, settings: EncodeSettings, prefer_engine: str | None = None) -> FileResult:
+    """Écrit une nouvelle archive où chaque modèle est converti en .drc ; le reste est recopié."""
+    started = time.perf_counter()
+    lossy: list[str] = []
+
+    def transform(name: str, data: bytes):
+        kind = detect_kind_from_bytes(name, data[:96])
+        if kind not in MODEL_KINDS:
+            return None
+        try:
+            encoded, _ = encode_bytes(mesh_from_bytes(kind, data), settings, prefer_engine)
+        except (MeshReadError, EngineError, VerifyError, MemoryError):
+            return None  # modèle illisible ou invérifiable : recopié tel quel
+        if len(encoded) >= len(data):
+            return None
+        if kind in LOSSY_KINDS:
+            lossy.append(name)
+        return _swap_suffix(name, ".drc"), encoded
+
+    return _convert_zip(Path(src), Path(dst), transform, started, lossy)
+
+
+def decode_zip(src: Path, dst: Path, fmt: Literal["stl", "obj", "ply"]) -> FileResult:
+    """Écrit une nouvelle archive où chaque .drc est reconverti dans le format demandé."""
+    started = time.perf_counter()
+
+    def transform(name: str, data: bytes):
+        if kind_from_name(name) is not FileKind.DRC:
+            return None
+        try:
+            return _swap_suffix(name, "." + fmt), decode_bytes(data, fmt)
+        except (MeshReadError, EngineError, VerifyError, MemoryError):
+            return None
+
+    return _convert_zip(Path(src), Path(dst), transform, started, [])

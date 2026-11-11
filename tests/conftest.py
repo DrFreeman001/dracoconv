@@ -170,3 +170,19 @@ def model_tree(tmp_path) -> Path:
     make_zip(root / "pack.zip", {"x/one.stl": stl_bytes(small), "two.stl": stl_bytes(medium), "lisezmoi.txt": b"bonjour"})
     (root / "notes.txt").write_text("rien", encoding="ascii")
     return root
+
+
+def make_encrypted_zip(path) -> Path:
+    """Archive dont les entrées portent le drapeau « chiffré » (bit 0), comme un ZIP protégé par mot de passe."""
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("secret.stl", stl_bytes(CUBE))
+    raw = bytearray(buffer.getvalue())
+    local, central = raw.find(b"PK" + bytes([3, 4])), raw.find(b"PK" + bytes([1, 2]))
+    raw[local + 6] |= 1
+    raw[central + 8] |= 1
+    Path(path).write_bytes(bytes(raw))
+    return Path(path)
