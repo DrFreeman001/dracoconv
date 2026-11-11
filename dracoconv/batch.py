@@ -27,6 +27,8 @@ from .settings import EncodeSettings
 #: Types dont l'original n'est jamais remplacé : la conversion y perd des données.
 NEVER_REPLACED = {FileKind.THREEMF, FileKind.ZIP}
 _MTIME_TOLERANCE_S = 0.001
+_SAME_MTIME_S = 2.0  # certains systèmes de fichiers arrondissent les dates à 2 secondes
+_STRIPPED_SUFFIXES = {".stl", ".obj", ".ply", ".3mf", ".drc"}
 
 
 @dataclass
@@ -55,6 +57,7 @@ class PlanItem:
     mtime: float
     replace_allowed: bool
     warning: str | None = None  # « data_loss » ou « not_replaceable »
+    skip_reason: str | None = None  # rien à faire pour ce fichier, et pourquoi
 
 
 def check_free_space(dest: Path, needed_bytes: int) -> bool:
@@ -86,6 +89,31 @@ def _mirror_folder(src: Path, roots: list[Path], mirror_dir: Path) -> Path:
     return mirror_dir / relative
 
 
+def _already_converted(src: Path, mtime: float, kind: FileKind, tag: str, folder: Path) -> Path | None:
+    """Fichier déjà produit pour cette source lors d'un passage précédent, s'il existe.
+
+    Un fichier produit reçoit la date de modification de sa source : même nom attendu et même
+    date signifient que la conversion a déjà eu lieu et que la source n'a pas changé depuis.
+    """
+    stem = src.stem
+    if Path(stem).suffix.lower() in _STRIPPED_SUFFIXES and (kind is FileKind.ZIP or tag != "drc"):
+        stem = Path(stem).stem
+    if kind is FileKind.ZIP:
+        names = [f"{stem}.{tag}.zip"]
+    elif tag == "drc":
+        names = [f"{stem}.drc", f"{src.name}.drc"]
+    else:
+        names = [f"{stem}.{tag}"]
+    for name in names:
+        candidate = folder / name
+        try:
+            if abs(os.stat(long_path(candidate)).st_mtime - mtime) <= _SAME_MTIME_S and candidate != src:
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
 def build_plan(inv: Inventory, roots: list[Path], settings: EncodeSettings, options: BatchOptions) -> list[PlanItem]:
     """Liste des conversions à faire, avec le nom de chaque fichier produit."""
     if options.originals == "replace" and not options.confirm_replace:
@@ -107,11 +135,16 @@ def build_plan(inv: Inventory, roots: list[Path], settings: EncodeSettings, opti
         if options.originals == "mirror":
             folder = _mirror_folder(entry.path, list(roots), Path(options.mirror_dir))
         tag = "drc" if encoding else options.output_format
+        replace_allowed = entry.kind not in NEVER_REPLACED
+        existing = _already_converted(entry.path, entry.mtime, entry.kind, tag, folder)
+        if existing is not None:
+            items.append(PlanItem(entry.path, existing, entry.kind, entry.size, entry.mtime, replace_allowed,
+                                  skip_reason="already_converted"))
+            continue
         if entry.kind is FileKind.ZIP:
             dst = zip_output_path(entry.path, tag, folder, taken)
         else:
             dst = output_path(entry.path, "." + tag, folder, taken)
-        replace_allowed = entry.kind not in NEVER_REPLACED
         warning = None
         if entry.kind is FileKind.THREEMF:
             warning = "data_loss"
@@ -154,10 +187,11 @@ class Journal:
         with self._lock, self._db:
             start = self._db.execute("SELECT COALESCE(MAX(position), 0) FROM files").fetchone()[0]
             self._db.executemany(
-                "INSERT OR IGNORE INTO files VALUES (?,?,?,?,NULL,?,'pending',NULL,NULL,NULL,?,?,?,?)",
+                "INSERT OR IGNORE INTO files VALUES (?,?,?,?,NULL,?,?,?,NULL,NULL,?,?,?,?)",
                 [
-                    (str(i.src), str(i.dst), i.kind.value, i.size, text, i.mtime, int(i.replace_allowed), i.warning,
-                     start + n + 1)
+                    (str(i.src), str(i.dst), i.kind.value, i.size, text,
+                     "skipped" if i.skip_reason else "pending", i.skip_reason,
+                     i.mtime, int(i.replace_allowed), i.warning, start + n + 1)
                     for n, i in enumerate(items)
                 ],
             )

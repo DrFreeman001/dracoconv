@@ -226,6 +226,30 @@ def test_on_progress_receives_every_result(model_tree):
     assert len(seen) == 5 and all(r.state == "done" for r in seen)
 
 
+def test_second_run_without_journal_converts_nothing_new(model_tree):
+    run_batch(model_tree)
+    before = sorted(p.name for p in model_tree.rglob("*"))
+    s = run_batch(model_tree).summary()
+    assert s["done"] == 0 and s["skipped"] == 5 and s["reasons"] == {"already_converted": 5}
+    assert sorted(p.name for p in model_tree.rglob("*")) == before
+
+
+def test_modified_source_is_converted_again(model_tree, sphere):
+    run_batch(model_tree)
+    write_binary_stl(model_tree / "a.stl", sphere)
+    os.utime(model_tree / "a.stl", (2_000_000_000, 2_000_000_000))
+    s = run_batch(model_tree).summary()
+    assert s["done"] == 1 and s["skipped"] == 4
+    assert same_geometry(decode_to_mesh(model_tree / "a.stl.drc"), sphere)
+
+
+def test_decoding_next_to_the_untouched_original_is_skipped(model_tree):
+    run_batch(model_tree)
+    s = run_batch(model_tree, direction="decode", output_format="stl", kinds=frozenset({FileKind.DRC})).summary()
+    assert s["reasons"] == {"already_converted": 3} and s["done"] == 1  # d.drc vient d'un OBJ : pas de d.stl
+    assert (model_tree / "d.stl").exists() and not (model_tree / "a (1).stl").exists()
+
+
 def test_default_workers_is_half_the_cores():
     assert BatchOptions().resolved_workers() == max(1, (os.cpu_count() or 2) // 2)
     assert BatchOptions(workers=3).resolved_workers() == 3

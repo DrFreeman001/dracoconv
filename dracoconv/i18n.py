@@ -61,6 +61,17 @@ def tr(key: str, **fmt) -> str:
     return tr_in(_current, key, **fmt)
 
 
+def format_size(size: float) -> str:
+    """Taille lisible : « 73,6 Go » en français, « 73.6 GB » en anglais."""
+    value = float(size)
+    for unit in ("bytes", "kb", "mb", "gb"):
+        if abs(value) < 1024:
+            decimals = 0 if unit == "bytes" else (1 if abs(value) >= 10 else 2)
+            return f"{format_number(value, decimals)} {tr('unit.' + unit)}"
+        value /= 1024
+    return f"{format_number(value, 1 if abs(value) >= 10 else 2)} {tr('unit.tb')}"
+
+
 def format_number(value: float, decimals: int = 3) -> str:
     """Nombre décimal selon la langue : virgule en français, point en anglais."""
     text = f"{value:.{decimals}f}"
