@@ -91,3 +91,48 @@ def same_geometry(a: Mesh, b: Mesh) -> bool:
     ta, _ = a.canonical_triangles()
     tb, _ = b.canonical_triangles()
     return ta.shape == tb.shape and bool(np.array_equal(ta, tb))
+
+
+def make_textured_obj(tmp_path) -> Path:
+    p = Path(tmp_path) / "tex.obj"
+    p.write_text(
+        "# triangle avec texture\nv 0 0 0\nv 10 0 0\nv 0 10 0\nvt 0 0\nvt 1 0\nvt 0 1\nvn 0 0 1\n"
+        "f 1/1/1 2/2/1 3/3/1\n",
+        encoding="ascii",
+    )
+    return p
+
+
+def make_quad_cube_obj(tmp_path) -> Path:
+    p = Path(tmp_path) / "quads.obj"
+    lines = [f"v {x} {y} {z}" for x, y, z in _CUBE_V.astype(int)]
+    lines += ["f 1 4 3 2", "f 5 6 7 8", "f 1 2 6 5", "f 2 3 7 6", "f 3 4 8 7", "f 4 1 5 8"]
+    p.write_text("\n".join(lines) + "\n", encoding="ascii")
+    return p
+
+
+def make_colored_ply(tmp_path) -> Path:
+    p = Path(tmp_path) / "col.ply"
+    p.write_text(
+        "ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\n"
+        "property uchar red\nproperty uchar green\nproperty uchar blue\nelement face 1\n"
+        "property list uchar int vertex_indices\nend_header\n"
+        "0 0 0 255 0 0\n10 0 0 0 255 0\n0 10 0 0 0 255\n3 0 1 2\n",
+        encoding="ascii",
+    )
+    return p
+
+
+def make_two_cube_3mf(tmp_path, cube: Mesh) -> Path:
+    import trimesh
+
+    scene = trimesh.Scene()
+    scene.add_geometry(trimesh.Trimesh(cube.positions, cube.faces, process=False), node_name="a")
+    scene.add_geometry(
+        trimesh.Trimesh(cube.positions, cube.faces, process=False),
+        node_name="b",
+        transform=trimesh.transformations.translation_matrix([100, 0, 0]),
+    )
+    p = Path(tmp_path) / "two.3mf"
+    p.write_bytes(scene.export(file_type="3mf"))
+    return p
