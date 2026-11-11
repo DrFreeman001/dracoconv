@@ -1,0 +1,158 @@
+# dracoconv
+
+*[Version française](README.md)*
+
+A Draco (`.drc`) converter for 3D models, both ways, on a file, a folder or a whole drive. Before converting, it tells you how much space you can expect to save and how much quality the chosen settings cost.
+
+Built to archive a collection of 3D-printing models: the `.drc` files open in OrcaSlicer, and convert back to STL for software that does not read Draco yet.
+
+- **To `.drc`** from STL (ASCII and binary), OBJ, PLY, 3MF (geometry only), and those formats inside ZIP archives.
+- **From `.drc`** to binary STL, OBJ or PLY.
+- **Window and command line**, in French and English.
+- **Every setting of the Draco encoder**, each one explained.
+
+## What to know before using it
+
+- **Without quantization (the default), geometry is kept bit for bit.** Every produced file is read back and compared with its source before being reported as good. Only the order of triangles changes and, for an STL, the header and the stored normals.
+- **An original is never touched by default.** "Replace" mode must be confirmed, sends the original to the recycle bin only after verification, and never applies to 3MF or ZIP files.
+- **3MF: conversion loses data** (plates, print settings, colours, object separation) and rarely saves space, since a 3MF is already compressed. Bambu Studio and OrcaSlicer project files are not read and are left as they are. `.gcode.3mf` files are ignored.
+- **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts more open edges than in the original STL. The "Preserve order" setting avoids this, at the cost of a file roughly twice as large. The `quality` command flags the affected files. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
+- **Beyond about 22 bits, quantizing gains no more precision** for a model of ordinary size: the limit becomes that of the numbers in the original file.
+
+## Installation
+
+Windows, Python 3.11 or newer.
+
+```bash
+git clone <repository address> dracoconv
+```
+
+```bash
+cd dracoconv
+```
+
+```bash
+py -m venv .venv
+```
+
+```bash
+.venv\Scripts\python -m pip install -e .
+```
+
+The built-in engine is enough for everyday use. Three settings (`--metadata`, `--preserve-polygons`, `--generic-bits`) and 30 bits also need Google's official tools, built once (git and the Microsoft C++ build tools are required):
+
+```bash
+.venv\Scripts\python -m pip install cmake
+```
+
+```bash
+pwsh tools/build_draco.ps1
+```
+
+## The window
+
+```bash
+.venv\Scripts\dracoconv-gui
+```
+
+Five steps:
+
+1. **Source files** — pick files, folders or drives, and the direction. The scan only reads.
+2. **Settings** — each setting shows a sentence of explanation, a tooltip, its concrete effect on your models, and detailed help in the right-hand panel.
+3. **Savings and quality** — instant projection, then refined on a sample that is actually encoded, with a margin of error; theoretical and measured deviation; size / deviation curve by number of bits.
+4. **Convert** — what happens to originals (keep, mirror, replace), detailed plan, start, stop.
+5. **Log** — result file by file, CSV export, retry of failed files.
+
+The language is changed from the menu, without restarting.
+
+## The command line
+
+List the 3D files of a folder, changing nothing:
+
+```bash
+dracoconv --lang en scan "D:\Models"
+```
+
+Project the savings, instantly first and then on a sample that is actually encoded:
+
+```bash
+dracoconv --lang en estimate "D:\Models" --sample
+```
+
+Measure the quality loss for a given setting:
+
+```bash
+dracoconv --lang en quality "D:\Models\part.stl" --position-bits 14
+```
+
+Convert to `.drc`, converted files next to the originals:
+
+```bash
+dracoconv --lang en encode "D:\Models"
+```
+
+Convert into a mirror folder, writing nothing into the collection:
+
+```bash
+dracoconv --lang en encode "D:\Models" --originals mirror --mirror-dir "E:\Models-drc"
+```
+
+See the plan without doing anything:
+
+```bash
+dracoconv --lang en encode "D:\Models" --dry-run
+```
+
+Convert back to STL:
+
+```bash
+dracoconv --lang en decode "D:\Models" --format stl
+```
+
+Show the detailed help of a setting:
+
+```bash
+dracoconv --lang en params position_bits
+```
+
+Useful options: `--lang fr|en`, `--json`, `--workers N`, `--journal batch.sqlite` (running the same command with the same journal resumes an interrupted batch), `--profile`, `--engine dracopy|reference`.
+
+Running `encode` again on a folder that was already processed redoes nothing: a produced file carries the date of its source, which is how already converted files are recognised.
+
+## Settings
+
+| Option | Role | Default |
+|---|---|---|
+| `--compression-level` | Compression effort from 0 to 10. Never alters the geometry. | 10 |
+| `--position-bits` | Position quantization bits; 0 keeps coordinates as they are. | 0 |
+| `--tolerance-mm` | Largest accepted deviation; the number of bits is worked out per file. | none |
+| `--texcoord-bits` | Precision of texture coordinates. | 10 |
+| `--normal-bits` | Precision of normals, when they are stored. | 8 |
+| `--generic-bits` | Precision of other attributes. | 8 |
+| `--skip` | Attributes to leave out: `normal`, `texcoord`, `color`, `generic`, or `none`. | `normal` |
+| `--point-cloud` | Stores vertices without triangles. | no |
+| `--preserve-order` | Keeps the order of vertices and triangles; larger file. | no |
+| `--metadata` | Keeps the object, group and material names of an OBJ. | no |
+| `--preserve-polygons` | Keeps faces with four or more sides from an OBJ or PLY. | no |
+
+The largest deviation of a vertex is `model size ÷ (2^bits − 1) × √3 ÷ 2`. Example: 14 bits on a 180 mm model give a step of 0.011 mm and a deviation of at most 0.0095 mm.
+
+## Measurements
+
+The compression ratios shipped with the software were measured on a real collection of printing models; see [docs/mesures.md](docs/mesures.md) (in French). The sampled projection replaces them with those of your own files.
+
+## Development
+
+```bash
+.venv\Scripts\python -m pip install -e .[dev]
+```
+
+```bash
+.venv\Scripts\python -m pytest
+```
+
+Interface texts live in `dracoconv/locales/fr.json` and `en.json`; a test fails if a key is missing in one language. Settings are described once, in `dracoconv/params.py`, which feeds the window, the command line and the help.
+
+## License
+
+Apache-2.0, like Draco. Draco is a Google project; OrcaSlicer and Bambu Studio belong to their respective authors.

@@ -1,3 +1,158 @@
 # dracoconv
 
-Convertisseur Draco (.drc) pour modèles 3D. Documentation complète à venir.
+*[English version](README.en.md)*
+
+Convertisseur Draco (`.drc`) pour modèles 3D, dans les deux sens, sur un fichier, un dossier ou un disque entier. Avant de convertir, il annonce le gain de place attendu et la perte de qualité selon les réglages.
+
+Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'ouvrent dans OrcaSlicer, et se reconvertissent en STL pour les logiciels qui ne lisent pas encore Draco.
+
+- **Vers `.drc`** depuis STL (texte et binaire), OBJ, PLY, 3MF (géométrie seule) et ces formats à l'intérieur d'archives ZIP.
+- **Depuis `.drc`** vers STL binaire, OBJ ou PLY.
+- **Fenêtre et ligne de commande**, en français et en anglais.
+- **Tous les réglages de l'encodeur Draco**, chacun expliqué.
+
+## Ce qu'il faut savoir avant de s'en servir
+
+- **Sans quantification (réglage par défaut), la géométrie est conservée au bit près.** Chaque fichier produit est relu et comparé à sa source avant d'être déclaré bon. Seuls changent l'ordre des triangles et, pour un STL, l'en-tête et les normales stockées.
+- **Un original n'est jamais touché par défaut.** Le mode « remplacer » doit être confirmé, envoie l'original à la corbeille seulement après vérification, et ne s'applique jamais aux 3MF ni aux ZIP.
+- **3MF : la conversion perd des données** (plateaux, réglages d'impression, couleurs, séparation des objets) et fait rarement gagner de la place, un 3MF étant déjà compressé. Les projets Bambu Studio et OrcaSlicer ne sont pas lus et sont laissés tels quels. Les fichiers `.gcode.3mf` sont ignorés.
+- **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors plus d'arêtes ouvertes que dans le STL d'origine. Le réglage « Conserver l'ordre » l'évite, au prix d'un fichier environ deux fois plus gros. La commande `quality` signale les fichiers concernés. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
+- **Au-delà de 22 bits environ, quantifier ne gagne plus en précision** pour un modèle de taille courante : la limite devient celle des nombres du fichier d'origine.
+
+## Installation
+
+Windows, Python 3.11 ou plus récent.
+
+```bash
+git clone <adresse du dépôt> dracoconv
+```
+
+```bash
+cd dracoconv
+```
+
+```bash
+py -m venv .venv
+```
+
+```bash
+.venv\Scripts\python -m pip install -e .
+```
+
+Le moteur intégré suffit pour l'usage courant. Trois réglages (`--metadata`, `--preserve-polygons`, `--generic-bits`) et les 30 bits demandent en plus les outils officiels de Google, à compiler une fois (git et les outils de compilation Microsoft C++ sont nécessaires) :
+
+```bash
+.venv\Scripts\python -m pip install cmake
+```
+
+```bash
+pwsh tools/build_draco.ps1
+```
+
+## La fenêtre
+
+```bash
+.venv\Scripts\dracoconv-gui
+```
+
+Cinq étapes :
+
+1. **Fichiers source** — choisir fichiers, dossiers ou disques, et le sens de conversion. L'analyse ne fait que lire.
+2. **Réglages** — chaque paramètre affiche une phrase d'explication, une infobulle, son effet concret sur vos modèles, et une aide détaillée dans le panneau de droite.
+3. **Gain et qualité** — projection instantanée, puis affinée sur un échantillon réellement encodé, avec marge d'erreur ; écart théorique et mesuré ; courbe taille / écart selon le nombre de bits.
+4. **Conversion** — sort des originaux (garder, miroir, remplacer), plan détaillé, lancement, arrêt.
+5. **Journal** — résultat fichier par fichier, export CSV, relance des échecs.
+
+La langue se change dans le menu, sans redémarrer.
+
+## La ligne de commande
+
+Recenser les fichiers 3D d'un dossier, sans rien modifier :
+
+```bash
+dracoconv scan "D:\Modeles"
+```
+
+Projeter le gain, d'abord instantanément puis sur un échantillon réellement encodé :
+
+```bash
+dracoconv estimate "D:\Modeles" --sample
+```
+
+Mesurer la perte de qualité pour un réglage donné :
+
+```bash
+dracoconv quality "D:\Modeles\piece.stl" --position-bits 14
+```
+
+Convertir vers `.drc`, les fichiers convertis à côté des originaux :
+
+```bash
+dracoconv encode "D:\Modeles"
+```
+
+Convertir vers un dossier miroir, sans rien écrire dans la collection :
+
+```bash
+dracoconv encode "D:\Modeles" --originals mirror --mirror-dir "E:\Modeles-drc"
+```
+
+Voir le plan sans rien faire :
+
+```bash
+dracoconv encode "D:\Modeles" --dry-run
+```
+
+Reconvertir en STL :
+
+```bash
+dracoconv decode "D:\Modeles" --format stl
+```
+
+Afficher l'aide détaillée d'un paramètre :
+
+```bash
+dracoconv params position_bits
+```
+
+Options utiles : `--lang fr|en`, `--json`, `--workers N`, `--journal lot.sqlite` (relancer la même commande avec le même journal reprend un lot interrompu), `--profile`, `--engine dracopy|reference`.
+
+Relancer `encode` sur un dossier déjà traité ne refait rien : un fichier produit porte la date de sa source, ce qui permet de reconnaître ce qui est déjà converti.
+
+## Les paramètres
+
+| Option | Rôle | Défaut |
+|---|---|---|
+| `--compression-level` | Effort de compression de 0 à 10. N'altère jamais la géométrie. | 10 |
+| `--position-bits` | Bits de quantification des positions ; 0 conserve les coordonnées telles quelles. | 0 |
+| `--tolerance-mm` | Écart maximal accepté ; le nombre de bits est calculé pour chaque fichier. | aucune |
+| `--texcoord-bits` | Précision des coordonnées de texture. | 10 |
+| `--normal-bits` | Précision des normales, quand elles sont enregistrées. | 8 |
+| `--generic-bits` | Précision des autres attributs. | 8 |
+| `--skip` | Attributs à ne pas enregistrer : `normal`, `texcoord`, `color`, `generic`, ou `none`. | `normal` |
+| `--point-cloud` | Enregistre les sommets sans les triangles. | non |
+| `--preserve-order` | Garde l'ordre des sommets et des triangles ; fichier plus gros. | non |
+| `--metadata` | Conserve les noms d'objets, de groupes et de matériaux d'un OBJ. | non |
+| `--preserve-polygons` | Conserve les faces à quatre côtés ou plus d'un OBJ ou PLY. | non |
+
+L'écart maximal d'un sommet vaut `taille du modèle ÷ (2^bits − 1) × √3 ÷ 2`. Exemple : 14 bits sur un modèle de 180 mm donnent un pas de 0,011 mm et un écart d'au plus 0,0095 mm.
+
+## Mesures
+
+Les ratios de compression livrés avec le logiciel ont été mesurés sur une collection réelle de modèles d'impression ; voir [docs/mesures.md](docs/mesures.md). La projection par échantillon les remplace par ceux de vos propres fichiers.
+
+## Développement
+
+```bash
+.venv\Scripts\python -m pip install -e .[dev]
+```
+
+```bash
+.venv\Scripts\python -m pytest
+```
+
+Les textes de l'interface vivent dans `dracoconv/locales/fr.json` et `en.json` ; un test échoue si une clé manque dans une langue. Les paramètres sont décrits une seule fois, dans `dracoconv/params.py`, qui alimente la fenêtre, la ligne de commande et l'aide.
+
+## Licence
+
+Apache-2.0, comme Draco. Draco est un projet de Google ; OrcaSlicer et Bambu Studio appartiennent à leurs auteurs respectifs.

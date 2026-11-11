@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
                     "low": round(part.low_bytes / part.current_bytes, 4),
                     "high": round(part.high_bytes / part.current_bytes, 4),
                 }
+        for path, reason in projection.unreadable.items():
+            print(f"  non encodé ({reason}) : {path}", flush=True)
         print(f"{name}: {projection.sampled_files} fichiers encodés en {time.perf_counter() - started:.0f} s — "
               + ", ".join(f"{k} {v[name]['ratio']:.3f}" for k, v in report.items() if name in v), flush=True)
     ratios["_meta"] = {

@@ -201,6 +201,7 @@ def _projection_dict(p) -> dict:
         "saved_pct": round(p.saved_pct, 2), "sampled_files": p.sampled_files,
         "by_kind": {k.value: asdict(v) for k, v in p.by_kind.items()},
         "no_gain": [str(x) for x in p.no_gain],
+        "unreadable": {str(path): reason for path, reason in p.unreadable.items()},
     }
 
 
@@ -229,6 +230,8 @@ def cmd_estimate(args) -> int:
               f"{format_size(row['projected_bytes']):>14}")
     if projection.no_gain:
         print(f"{tr('cli.estimate.no_gain')} : {len(projection.no_gain)}")
+    for path, reason in projection.unreadable.items():
+        print(f"{tr('state.skipped')} : {path} ({tr('reason.' + reason)})")
     return EXIT_OK
 
 
@@ -247,7 +250,7 @@ def _quality_of(path: Path, settings: EncodeSettings, prefer: str | None) -> dic
         "identical": report.identical,
         "size_before": mesh.source_size, "size_after": len(data),
         "triangles_before": report.triangles_before, "triangles_after": report.triangles_after,
-        "degenerate_created": report.degenerate_created,
+        "degenerate_created": report.degenerate_created, "vertices_split": report.vertices_split,
         "watertight_before": report.watertight_before, "watertight_after": report.watertight_after,
         "volume_change_pct": report.volume_change_pct,
     }
@@ -271,6 +274,8 @@ def _print_quality(q: dict) -> None:
     print(f"  {tr('cli.quality.identical')} : {yes_no(q['identical'])}")
     print(f"  {tr('cli.quality.size')} : {format_size(q['size_before'])} -> {format_size(q['size_after'])}")
     print(f"  {tr('cli.quality.collapsed')} : {q['degenerate_created']}")
+    if q["vertices_split"]:
+        print(f"  {tr('cli.quality.split', n=q['vertices_split'])}")
     print(f"  {tr('cli.quality.watertight')} : {yes_no(q['watertight_before'])} / {yes_no(q['watertight_after'])}")
     if q["volume_change_pct"] is not None:
         print(f"  {tr('cli.quality.volume')} : {format_number(q['volume_change_pct'], 4)} %")

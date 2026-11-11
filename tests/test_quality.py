@@ -72,6 +72,29 @@ def test_measure_detects_collapse(dense):
     assert r.degenerate_created > 0 and r.triangles_after < r.triangles_before and not r.identical
 
 
+def _two_cubes_sharing_one_vertex(cube) -> Mesh:
+    """Maillage non étanche au sens strict : deux cubes qui ne se touchent que par un sommet."""
+    second = cube.positions + np.float32(20)  # le coin (20,20,20) du premier est le coin (0,0,0) du second
+    positions = np.vstack([cube.positions, second[1:]])
+    remap = np.array([6] + list(range(8, 15)), dtype=np.uint32)
+    return Mesh(positions, np.vstack([cube.faces, remap[cube.faces]]))
+
+
+def test_split_vertices_are_reported(cube):
+    """Draco dédouble les sommets là où la surface n'est pas une variété ; un slicer y voit des arêtes ouvertes."""
+    mesh = _two_cubes_sharing_one_vertex(cube)
+    engine = DracoPyEngine()
+    default = measure(mesh, engine.decode(engine.encode(mesh, EncodeSettings())))
+    assert default.identical and default.vertices_split == 1
+    ordered = measure(mesh, engine.decode(engine.encode(mesh, replace(EncodeSettings(), preserve_order=True))))
+    assert ordered.identical and ordered.vertices_split == 0
+
+
+def test_closed_mesh_has_no_split_vertices(sphere):
+    engine = DracoPyEngine()
+    assert measure(sphere, engine.decode(engine.encode(sphere, EncodeSettings()))).vertices_split == 0
+
+
 def test_curve_monotonic(sphere):
     pts = curve(sphere, DracoPyEngine(), EncodeSettings(), bits=[8, 12, 16, 20])
     assert [p.bits for p in pts] == [8, 12, 16, 20]

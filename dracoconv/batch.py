@@ -11,6 +11,7 @@ import time
 from collections import Counter
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
@@ -276,6 +277,29 @@ class Journal:
                 writer.writerow([r[c] for c in _CSV_COLUMNS])
 
 
+#: Variables qui fixent le nombre de fils des bibliothèques de calcul (numpy, scipy).
+THREAD_VARIABLES = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")
+
+
+@contextmanager
+def _single_threaded_children():
+    """Les processus de travail héritent de ces variables à leur création.
+
+    Le parallélisme vient déjà des processus ; sans cela, chacun réserverait en plus des tampons
+    pour autant de fils qu'il y a de cœurs, ce qui épuise la mémoire sur une machine à 32 cœurs.
+    """
+    saved = {name: os.environ.get(name) for name in THREAD_VARIABLES}
+    os.environ.update({name: "1" for name in THREAD_VARIABLES})
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def available_memory() -> int | None:
     """Mémoire que Windows accepte encore de réserver, en octets ; None si inconnue.
 
@@ -327,6 +351,21 @@ def _convert_item(item: PlanItem, settings: EncodeSettings, options: BatchOption
     return result
 
 
+def _already_written(item: PlanItem) -> FileResult | None:
+    """Résultat d'un fichier que son processus a écrit avant de disparaître, s'il existe.
+
+    Un fichier n'est renommé à son nom définitif qu'après vérification, et reçoit la date de sa
+    source : sa présence avec cette date prouve que la conversion a abouti.
+    """
+    try:
+        source, produced = os.stat(long_path(item.src)), os.stat(long_path(item.dst))
+    except OSError:
+        return None
+    if abs(produced.st_mtime - source.st_mtime) > _SAME_MTIME_S:
+        return None
+    return FileResult(item.src, item.dst, "done", None, source.st_size, size_after=produced.st_size)
+
+
 def _safe_convert(item: PlanItem, settings: EncodeSettings, options: BatchOptions) -> FileResult:
     started = time.perf_counter()
     try:
@@ -374,7 +413,7 @@ def run(
         running: dict = {}
         needs: dict = {}
         try:
-            with ProcessPoolExecutor(max_workers=workers) as pool:
+            with _single_threaded_children(), ProcessPoolExecutor(max_workers=workers) as pool:
                 while True:
                     while queue and not halted() and len(running) < workers:
                         need = _MEMORY_BASE + queue[-1].size * _MEMORY_FACTOR
@@ -394,6 +433,7 @@ def run(
                         try:
                             result = future.result()
                         except BrokenProcessPool:
+                            alone.append(item)  # déjà retiré des conversions en cours : ne pas le perdre
                             raise
                         except BaseException as exc:
                             result = FileResult(item.src, None, "failed", reason_for(exc), item.size)
@@ -414,8 +454,14 @@ def run(
             if halted():
                 break
             finish(item, _safe_convert(item, settings, options))
-    # Les très gros fichiers, et ceux qui ont manqué de mémoire, passent un par un.
-    for item in alone + big:
+    # Ceux qui ont manqué de mémoire sont repris un par un. Un processus a pu finir d'écrire
+    # son fichier juste avant de mourir : ce fichier-là est déjà bon, on ne le refait pas.
+    for item in alone:
+        if halted():
+            break
+        finish(item, _already_written(item) or _safe_convert(item, settings, options))
+    # Les très gros fichiers passent un par un pour borner la mémoire.
+    for item in big:
         if halted():
             break
         finish(item, _safe_convert(item, settings, options))

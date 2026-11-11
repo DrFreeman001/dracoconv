@@ -336,5 +336,6 @@
   "reason.unsupported_3mf": "project 3MF (Bambu Studio, OrcaSlicer) not supported, left as is",
   "kind.gcode_3mf": "Sliced prints",
   "kind.compiler_obj": "Compiler files",
-  "kind.unknown": "Other"
+  "kind.unknown": "Other",
+  "cli.quality.split": "Vertices split by Draco: {n} (surface not watertight to begin with; a slicer may see extra open edges — \"Preserve order\" avoids it, at the cost of a larger file)"
 }

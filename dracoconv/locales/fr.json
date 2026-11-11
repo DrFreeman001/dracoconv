@@ -336,5 +336,6 @@
   "reason.unsupported_3mf": "3MF de projet (Bambu Studio, OrcaSlicer) non pris en charge, laissé tel quel",
   "kind.gcode_3mf": "Impressions tranchées",
   "kind.compiler_obj": "Fichiers de compilateur",
-  "kind.unknown": "Autres"
+  "kind.unknown": "Autres",
+  "cli.quality.split": "Sommets dédoublés par Draco : {n} (surface non étanche à l'origine ; un slicer peut y voir des arêtes ouvertes en plus — « Conserver l'ordre » l'évite, au prix d'un fichier plus gros)"
 }

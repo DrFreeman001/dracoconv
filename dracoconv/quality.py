@@ -65,6 +65,9 @@ class QualityReport:
     degenerate_created: int  # triangles écrasés par la conversion
     vertices_merged: int
     identical: bool
+    #: Sommets que Draco a dédoublés (surface non variété). La géométrie est intacte, mais un
+    #: logiciel qui relie les triangles par numéro de sommet y verra des arêtes ouvertes.
+    vertices_split: int = 0
     watertight_before: bool | None = None
     watertight_after: bool | None = None
     volume_change_pct: float | None = None
@@ -107,6 +110,7 @@ def measure(source: "Mesh", decoded: "Mesh", integrity: bool = True) -> QualityR
         vertices_merged=max(0, len(np.unique(source.positions, axis=0)) - len(np.unique(decoded.positions, axis=0)))
         if not identical else 0,
         identical=identical,
+        vertices_split=max(0, len(decoded.positions) - len(source.positions)) if source.triangle_count() else 0,
     )
     if integrity:
         report.watertight_before, volume_before = _integrity(source)

@@ -12,7 +12,7 @@ from typing import Callable, Literal
 import numpy as np
 
 from .config import config_dir
-from .convert import VerifyError, encode_bytes
+from .convert import VerifyError, encode_bytes, reason_for
 from .engine import EngineError
 from .io import MODEL_KINDS, FileKind, detect_kind_from_bytes, load_mesh, mesh_from_bytes
 from .io.paths import long_path
@@ -118,6 +118,8 @@ class Projection:
     by_kind: dict[FileKind, KindProjection]
     method: Literal["instant", "sampled"]
     no_gain: list[Path] = field(default_factory=list)
+    #: Fichiers de l'échantillon qui n'ont pas pu être encodés, avec la raison ; ils resteraient tels quels.
+    unreadable: dict[Path, str] = field(default_factory=dict)
     sampled_files: int = 0
 
     @property
@@ -163,17 +165,20 @@ def instant(inv: Inventory, settings: EncodeSettings, ratios: dict | None = None
     return _total(by_kind, "instant")
 
 
-def _encoded_size(entry: FileEntry, settings: EncodeSettings) -> tuple[int, bool]:
-    """Taille qu'aurait le fichier après conversion, et s'il resterait tel quel faute de gain."""
+def _encoded_size(entry: FileEntry, settings: EncodeSettings) -> tuple[int, bool, str | None]:
+    """Taille qu'aurait le fichier après conversion, s'il resterait tel quel faute de gain,
+    et la raison s'il n'a pas pu être encodé."""
     try:
         if entry.kind is FileKind.ZIP:
-            return _encoded_zip_size(entry, settings)
+            return (*_encoded_zip_size(entry, settings), None)
         data, _ = encode_bytes(load_mesh(entry.path, entry.kind), settings)
-    except (MeshReadError, EngineError, VerifyError, OSError, MemoryError, zipfile.BadZipFile):
-        return entry.size, False  # illisible : le fichier resterait tel quel
+    except zipfile.BadZipFile:
+        return entry.size, False, "unreadable"
+    except (MeshReadError, EngineError, VerifyError, OSError, MemoryError) as exc:
+        return entry.size, False, reason_for(exc)  # le fichier resterait tel quel
     if len(data) >= entry.size:
-        return entry.size, True
-    return len(data), False
+        return entry.size, True, None
+    return len(data), False, None
 
 
 def _encoded_zip_size(entry: FileEntry, settings: EncodeSettings) -> tuple[int, bool]:
@@ -220,6 +225,7 @@ def sampled(
     picks = {key: [strata[key][i] for i in rng.permutation(len(strata[key]))[:per_class]] for key in order}
     measured: dict[tuple[FileKind, int], list[tuple[int, int]]] = {key: [] for key in order}
     no_gain: list[Path] = []
+    unreadable: dict[Path, str] = {}
     total = sum(len(p) for p in picks.values())
     done = 0
     started = time.perf_counter()
@@ -232,10 +238,12 @@ def sampled(
             if done and (out_of_time or (stop is not None and stop.is_set())):
                 continue
             entry = picks[key][rank]
-            size, kept = _encoded_size(entry, settings)
+            size, kept, problem = _encoded_size(entry, settings)
             measured[key].append((entry.size, size))
             if kept:
                 no_gain.append(entry.path)
+            if problem:
+                unreadable[entry.path] = problem
             done += 1
             if on_progress is not None:
                 on_progress(done, total)
@@ -281,7 +289,7 @@ def sampled(
         projection.low_bytes = min(projection.projected_bytes, max(0, int(np.floor(low))))
         projection.high_bytes = max(projection.projected_bytes, int(np.ceil(high)))
         all_rounds += boot[kind]
-    result = _total(by_kind, "sampled", no_gain=no_gain, sampled_files=done)
+    result = _total(by_kind, "sampled", no_gain=no_gain, unreadable=unreadable, sampled_files=done)
     if by_kind:
         low, high = np.percentile(all_rounds, _PERCENTILES)
         result.low_bytes = min(result.projected_bytes, max(0, int(np.floor(low))))

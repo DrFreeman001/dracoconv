@@ -135,6 +135,7 @@ def test_unreadable_and_no_gain_files_keep_their_size(tmp_path, cube):
     inv = scan([tmp_path], STL_ONLY)
     p = sampled(inv, EncodeSettings(), seed=1)
     assert p.projected_bytes == p.current_bytes == 700
+    assert p.unreadable == {tmp_path / "bad.stl": "unreadable"} and p.no_gain == []
 
 
 def test_sampled_updates_user_ratios(stl_collection):

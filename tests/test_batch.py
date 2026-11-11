@@ -309,6 +309,43 @@ def test_broken_pool_falls_back_to_one_by_one(model_tree, monkeypatch):
     assert s["done"] == 5 and s["failed"] == 0
 
 
+def test_pool_dying_while_results_come_back_loses_no_file(model_tree, monkeypatch):
+    from concurrent.futures import Future
+    from concurrent.futures.process import BrokenProcessPool
+
+    class DiesOnce(_InlinePool):
+        died = False
+
+        def submit(self, fn, *args):
+            if not DiesOnce.died:
+                DiesOnce.died = True
+                future = Future()
+                future.set_exception(BrokenProcessPool("mort pendant le travail"))
+                return future
+            return super().submit(fn, *args)
+
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", DiesOnce)
+    s = run_batch(model_tree, workers=4).summary()
+    assert s["done"] == 5 and s["pending"] == 0 and s["failed"] == 0
+
+
+def test_workers_run_single_threaded_math(model_tree, monkeypatch):
+    """Sans cela, chaque processus réserve des tampons pour autant de fils qu'il y a de cœurs."""
+    seen = {}
+
+    class Spy(_InlinePool):
+        def __init__(self, max_workers=None):
+            seen.update({name: os.environ.get(name) for name in batch.THREAD_VARIABLES})
+            super().__init__(max_workers)
+
+    monkeypatch.delenv("OPENBLAS_NUM_THREADS", raising=False)
+    monkeypatch.setenv("OMP_NUM_THREADS", "7")
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", Spy)
+    run_batch(model_tree, workers=4)
+    assert seen["OPENBLAS_NUM_THREADS"] == "1" and seen["OMP_NUM_THREADS"] == "1"
+    assert "OPENBLAS_NUM_THREADS" not in os.environ and os.environ["OMP_NUM_THREADS"] == "7"
+
+
 def test_memory_budget_limits_concurrency(model_tree, monkeypatch):
     active, peak = [0], [0]
     real = batch._convert_item
