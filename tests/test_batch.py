@@ -1,0 +1,231 @@
+import errno
+import os
+import shutil
+import threading
+from pathlib import Path
+
+import pytest
+
+from conftest import make_sphere, make_two_cube_3mf, same_geometry, write_binary_stl
+from dracoconv import batch
+from dracoconv.batch import BatchOptions, Journal, build_plan, check_free_space, run
+from dracoconv.engine.dracopy import DracoPyEngine
+from dracoconv.io import save_mesh
+from dracoconv.io.sniff import FileKind
+from dracoconv.scan import ScanOptions, scan
+from dracoconv.settings import EncodeSettings
+
+ALL = frozenset(FileKind)
+
+
+def plan_for(root, kinds=ALL, **options):
+    opts = BatchOptions(**options)
+    inv = scan([root], ScanOptions(kinds=kinds))
+    return build_plan(inv, [root], EncodeSettings(), opts), opts
+
+
+def run_batch(root, journal=None, kinds=ALL, stop=None, on_progress=None, settings=None, **options):
+    """Recense, planifie et exécute ; rend le journal. Un seul processus par défaut pour des tests rapides."""
+    options.setdefault("workers", 1)
+    settings = settings or EncodeSettings()
+    items, opts = plan_for(root, kinds, **options)
+    journal = journal or Journal(Path(root).parent / f"journal-{len(os.listdir(Path(root).parent))}.sqlite")
+    journal.add_plan(items, settings)
+    run(journal, settings, opts, on_progress=on_progress, stop=stop)
+    return journal
+
+
+def decode_to_mesh(path):
+    return DracoPyEngine().decode(Path(path).read_bytes())
+
+
+def test_keep_mode(model_tree):
+    s = run_batch(model_tree).summary()
+    assert s["total"] == 5 and s["done"] == 5 and s["failed"] == 0 and s["pending"] == 0
+    assert (model_tree / "a.stl").exists() and (model_tree / "a.drc").exists()
+    assert (model_tree / "sub" / "c.drc").exists() and (model_tree / "d.drc").exists()
+    assert (model_tree / "pack.drc.zip").exists() and (model_tree / "pack.zip").exists()
+    assert not (model_tree / "build.drc").exists()
+    assert 0 < s["bytes_after"] < s["bytes_before"]
+
+
+def test_parallel_run_gives_same_result(model_tree):
+    s = run_batch(model_tree, workers=3).summary()
+    assert s["done"] == 5 and (model_tree / "sub" / "b.drc").exists()
+
+
+def test_mirror_mode(model_tree, tmp_path):
+    run_batch(model_tree, originals="mirror", mirror_dir=tmp_path / "out")
+    assert (tmp_path / "out" / "sub" / "b.drc").exists() and (tmp_path / "out" / "pack.drc.zip").exists()
+    assert not (model_tree / "sub" / "b.drc").exists() and (model_tree / "sub" / "b.stl").exists()
+
+
+def test_mirror_requires_directory(model_tree):
+    with pytest.raises(ValueError, match="mirror_dir_required"):
+        plan_for(model_tree, originals="mirror")
+
+
+def test_replace_requires_confirmation(model_tree):
+    with pytest.raises(ValueError, match="replace_not_confirmed"):
+        plan_for(model_tree, originals="replace")
+
+
+def test_replace_sends_to_recycle_bin(model_tree, monkeypatch):
+    trashed = []
+    monkeypatch.setattr(batch, "send2trash", lambda p: (trashed.append(Path(p)), os.remove(p)))
+    run_batch(model_tree, originals="replace", confirm_replace=True)
+    assert model_tree / "a.stl" in trashed and (model_tree / "a.drc").exists() and not (model_tree / "a.stl").exists()
+    assert model_tree / "d.obj" in trashed
+
+
+def test_replace_never_applies_to_3mf_and_zip(model_tree, cube, monkeypatch):
+    make_two_cube_3mf(model_tree, cube)
+    trashed = []
+    monkeypatch.setattr(batch, "send2trash", lambda p: trashed.append(Path(p)))
+    items, _ = plan_for(model_tree, originals="replace", confirm_replace=True)
+    flagged = {i.src.suffix: (i.replace_allowed, i.warning) for i in items}
+    assert flagged[".3mf"] == (False, "data_loss") and flagged[".zip"] == (False, "not_replaceable")
+    assert flagged[".stl"] == (True, None)
+    run_batch(model_tree, originals="replace", confirm_replace=True)
+    assert trashed and not any(p.suffix in (".3mf", ".zip") for p in trashed)
+    assert (model_tree / "pack.zip").exists() and (model_tree / "two.3mf").exists()
+
+
+def test_recycle_bin_unavailable_keeps_original(model_tree, monkeypatch):
+    def refuse(path):
+        raise OSError("pas de corbeille sur ce volume")
+
+    monkeypatch.setattr(batch, "send2trash", refuse)
+    journal = run_batch(model_tree, originals="replace", confirm_replace=True)
+    assert (model_tree / "a.stl").exists() and (model_tree / "a.drc").exists()
+    assert journal.row(model_tree / "a.stl")["note"] == "recycle_unavailable"
+    assert journal.row(model_tree / "a.stl")["state"] == "done"
+
+
+def test_failed_file_keeps_original_and_batch_continues(model_tree, monkeypatch):
+    (model_tree / "bad.stl").write_bytes(b"garbage" * 30)
+    monkeypatch.setattr(batch, "send2trash", lambda p: os.remove(p))
+    journal = run_batch(model_tree, originals="replace", confirm_replace=True)
+    s = journal.summary()
+    assert s["failed"] == 1 and s["done"] == 5 and (model_tree / "bad.stl").exists()
+    assert journal.row(model_tree / "bad.stl")["reason"] == "unreadable" and s["reasons"] == {"unreadable": 1}
+
+
+def test_unwritable_destination_reported(model_tree, tmp_path, monkeypatch):
+    def refuse(path):
+        raise PermissionError(13, "refus")
+
+    monkeypatch.setattr("dracoconv.convert._open_part", refuse)
+    s = run_batch(model_tree, kinds=frozenset({FileKind.STL}), originals="mirror", mirror_dir=tmp_path / "out").summary()
+    assert s["total"] == 3 and s["failed"] == 3 and s["reasons"] == {"access_denied": 3}
+    assert (model_tree / "a.stl").exists()
+
+
+def test_resume_skips_done(model_tree, tmp_path):
+    journal = Journal(tmp_path / "j.sqlite")
+    stop = threading.Event()
+    seen = []
+
+    def stop_after_two(result):
+        seen.append(result)
+        if len(seen) == 2:
+            stop.set()
+
+    run_batch(model_tree, journal=journal, stop=stop, on_progress=stop_after_two)
+    assert journal.summary()["done"] == 2 and len(journal.pending()) == 3
+    second = []
+    run_batch(model_tree, journal=journal, on_progress=second.append)
+    assert len(second) == 3 and journal.summary()["done"] == 5 and not journal.pending()
+    assert {r.src for r in second}.isdisjoint({r.src for r in seen})
+
+
+def test_journal_survives_reopening(model_tree, tmp_path):
+    run_batch(model_tree, journal=Journal(tmp_path / "j.sqlite"))
+    reopened = Journal(tmp_path / "j.sqlite")
+    assert reopened.summary()["done"] == 5 and reopened.settings() == EncodeSettings()
+
+
+def test_retry_failed(model_tree, tmp_path, sphere):
+    (model_tree / "bad.stl").write_bytes(b"garbage" * 30)
+    journal = run_batch(model_tree, journal=Journal(tmp_path / "j.sqlite"))
+    write_binary_stl(model_tree / "bad.stl", sphere)
+    assert journal.retry_failed() == 1 and len(journal.pending()) == 1
+    run(journal, EncodeSettings(), BatchOptions(workers=1))
+    assert journal.summary()["failed"] == 0 and (model_tree / "bad.drc").exists()
+
+
+def test_changed_file_is_replanned(model_tree, tmp_path, sphere):
+    journal = Journal(tmp_path / "j.sqlite")
+    items, opts = plan_for(model_tree)
+    journal.add_plan(items, EncodeSettings())
+    write_binary_stl(model_tree / "a.stl", sphere)
+    os.utime(model_tree / "a.stl", (1_000_000, 1_000_000))
+    run(journal, EncodeSettings(), opts)
+    assert same_geometry(decode_to_mesh(model_tree / "a.drc"), sphere)
+    assert journal.row(model_tree / "a.stl")["note"] == "changed"
+
+
+def test_name_collision_in_plan(tmp_path, cube):
+    write_binary_stl(tmp_path / "m.stl", cube)
+    save_mesh(cube, tmp_path / "m.ply", "ply")
+    items, _ = plan_for(tmp_path)
+    assert {i.src.name: i.dst.name for i in items} == {"m.ply": "m.drc", "m.stl": "m.stl.drc"}
+
+
+def test_decode_direction(model_tree):
+    run_batch(model_tree)
+    journal = run_batch(model_tree, direction="decode", output_format="ply")
+    assert journal.summary()["done"] == 5
+    assert (model_tree / "a.ply").exists() and (model_tree / "pack.ply.zip").exists()
+    assert same_geometry(decode_to_mesh(model_tree / "a.drc"), make_sphere(2, 30.0))
+
+
+def test_big_files_run_alone(model_tree, monkeypatch):
+    active, peak = [0], [0]
+    real = batch.encode_file
+
+    def tracked(*a, **k):
+        active[0] += 1
+        peak[0] = max(peak[0], active[0])
+        try:
+            return real(*a, **k)
+        finally:
+            active[0] -= 1
+
+    monkeypatch.setattr(batch, "encode_file", tracked)
+    s = run_batch(model_tree, big_file_bytes=1, workers=4).summary()
+    assert s["done"] == 5 and peak[0] == 1
+
+
+def test_free_space_check(tmp_path):
+    assert check_free_space(tmp_path, 1) is True
+    assert check_free_space(tmp_path / "pas" / "encore", 1) is True
+    assert check_free_space(tmp_path, shutil.disk_usage(tmp_path).free + 1) is False
+
+
+def test_disk_full_pauses_batch(model_tree, monkeypatch):
+    def full(*a, **k):
+        raise OSError(errno.ENOSPC, "plus de place")
+
+    monkeypatch.setattr(batch, "encode_file", full)
+    journal = run_batch(model_tree, kinds=frozenset({FileKind.STL}))
+    s = journal.summary()
+    assert s["paused"] == "disk_full" and s["pending"] == s["total"] == 3 and s["failed"] == 0
+
+
+def test_csv_export(model_tree, tmp_path):
+    journal = run_batch(model_tree)
+    journal.export_csv(tmp_path / "j.csv")
+    lines = (tmp_path / "j.csv").read_text(encoding="utf-8-sig").splitlines()
+    assert lines[0].startswith("src,dst,kind") and len(lines) == 6
+
+
+def test_on_progress_receives_every_result(model_tree):
+    seen = []
+    run_batch(model_tree, on_progress=seen.append)
+    assert len(seen) == 5 and all(r.state == "done" for r in seen)
+
+
+def test_default_workers_is_half_the_cores():
+    assert BatchOptions().resolved_workers() == max(1, (os.cpu_count() or 2) // 2)
+    assert BatchOptions(workers=3).resolved_workers() == 3
