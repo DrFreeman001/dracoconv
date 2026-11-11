@@ -49,3 +49,13 @@ Constats sur une icosphère de 20 480 triangles (STL de 1 024 084 octets) :
 | `preserve_order` | oui | non (absent de la ligne de commande) |
 | `metadata` | non | oui (`--metadata`), sur le fichier OBJ d'origine |
 | `preserve_polygons` | non | oui (`-preserve_polygons`), sur le fichier OBJ/PLY d'origine |
+
+## Moteur de référence : Draco 1.5.9 compilé
+
+| Essai | Résultat |
+|---|---|
+| `-qp 0` | Aller-retour exact au bit près. |
+| `-qp 30` aux niveaux 0 à 8 | Accepté. |
+| `-qp 30` aux niveaux 9 et 10 | L'encodeur plante (code 0xC0000409). Le moteur ramène alors le niveau à 8. |
+| `-qp 31` | Refusé : « The maximum number of quantization bits for the position attribute is 30 ». |
+| Fichiers croisés | Un `.drc` de DracoPy est lu par `draco_decoder`, et inversement. |
