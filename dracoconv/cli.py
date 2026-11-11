@@ -361,7 +361,12 @@ def _batch(args, direction: str, settings: EncodeSettings) -> int:
         return EXIT_OK
     journal_path = args.journal or data_dir() / "journals" / f"{datetime.now():%Y%m%d-%H%M%S}-{direction}.sqlite"
     journal = Journal(journal_path)
-    journal.add_plan(items, settings)
+    journal.add_plan(items, settings, options)
+    stored = journal.options()
+    if (stored.direction, stored.originals, stored.mirror_dir) != (options.direction, options.originals,
+                                                                   options.mirror_dir):
+        journal.close()
+        raise UsageError(tr("cli.error.journal_mode"))
     if not args.json:
         print(tr("cli.batch.plan", n=len(journal.pending()), size=format_size(sum(i.size for i in journal.pending()))))
         if direction == "encode" and options.originals != "replace":

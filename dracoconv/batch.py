@@ -34,6 +34,8 @@ _MTIME_TOLERANCE_S = 0.001
 _MEMORY_BASE = 300 << 20
 _MEMORY_FACTOR = 20
 _MEMORY_SHARE = 0.6  # part de la mémoire disponible que le lot s'autorise
+_DRIVE_FIXED = 3
+_MAX_POOL_RESTARTS = 3
 _SAME_MTIME_S = 2.0  # certains systèmes de fichiers arrondissent les dates à 2 secondes
 _STRIPPED_SUFFIXES = {".stl", ".obj", ".ply", ".3mf", ".drc"}
 
@@ -96,21 +98,33 @@ def _mirror_folder(src: Path, roots: list[Path], mirror_dir: Path) -> Path:
     return mirror_dir / relative
 
 
-def _already_converted(src: Path, mtime: float, kind: FileKind, tag: str, folder: Path) -> Path | None:
+def _plain_stem(src: Path, kind: FileKind, tag: str) -> str:
+    stem = src.stem
+    if Path(stem).suffix.lower() in _STRIPPED_SUFFIXES and (kind is FileKind.ZIP or tag != "drc"):
+        stem = Path(stem).stem
+    return stem
+
+
+def _already_converted(
+    src: Path, mtime: float, kind: FileKind, tag: str, folder: Path, owns_stem: bool = True
+) -> Path | None:
     """Fichier déjà produit pour cette source lors d'un passage précédent, s'il existe.
 
     Un fichier produit reçoit la date de modification de sa source : même nom attendu et même
     date signifient que la conversion a déjà eu lieu et que la source n'a pas changé depuis.
+
+    ``owns_stem`` dit si cette source est celle à qui le plan donnerait le nom court
+    (``piece.drc``). Quand deux sources partagent le même nom sans extension, seule la première
+    y a droit ; l'autre ne peut avoir produit que ``piece.stl.drc``. Sans cette règle, le
+    ``piece.drc`` de l'une passerait pour la conversion de l'autre.
     """
-    stem = src.stem
-    if Path(stem).suffix.lower() in _STRIPPED_SUFFIXES and (kind is FileKind.ZIP or tag != "drc"):
-        stem = Path(stem).stem
+    stem = _plain_stem(src, kind, tag)
     if kind is FileKind.ZIP:
-        names = [f"{stem}.{tag}.zip"]
+        names = [f"{stem}.{tag}.zip"] if owns_stem else []
     elif tag == "drc":
-        names = [f"{stem}.drc", f"{src.name}.drc"]
+        names = [f"{stem}.drc", f"{src.name}.drc"] if owns_stem else [f"{src.name}.drc"]
     else:
-        names = [f"{stem}.{tag}"]
+        names = [f"{stem}.{tag}"] if owns_stem else []
     for name in names:
         candidate = folder / name
         try:
@@ -131,19 +145,31 @@ def build_plan(inv: Inventory, roots: list[Path], settings: EncodeSettings, opti
     taken: set[Path] = set()
     items: list[PlanItem] = []
     encoding = options.direction == "encode"
-    for entry in sorted(inv.entries, key=lambda e: str(e.path).lower()):
+    tag = "drc" if encoding else options.output_format
+
+    def wanted(entry) -> bool:
         if encoding:
-            wanted = entry.kind in MODEL_KINDS or (entry.kind is FileKind.ZIP and entry.archive_models > 0)
-        else:
-            wanted = entry.kind is FileKind.DRC or (entry.kind is FileKind.ZIP and entry.archive_drc > 0)
-        if not wanted:
-            continue
-        folder = entry.path.parent
+            return entry.kind in MODEL_KINDS or (entry.kind is FileKind.ZIP and entry.archive_models > 0)
+        return entry.kind is FileKind.DRC or (entry.kind is FileKind.ZIP and entry.archive_drc > 0)
+
+    def folder_of(entry) -> Path:
         if options.originals == "mirror":
-            folder = _mirror_folder(entry.path, list(roots), Path(options.mirror_dir))
-        tag = "drc" if encoding else options.output_format
+            return _mirror_folder(entry.path, list(roots), Path(options.mirror_dir))
+        return entry.path.parent
+
+    entries = [e for e in sorted(inv.entries, key=lambda e: str(e.path).lower()) if wanted(e)]
+    # Première source de chaque nom sans extension, par dossier de destination et par famille
+    # (archives d'un côté, modèles de l'autre) : c'est elle qui reçoit le nom court.
+    owners: dict[tuple, Path] = {}
+    for entry in entries:
+        key = (folder_of(entry), entry.kind is FileKind.ZIP, _plain_stem(entry.path, entry.kind, tag).lower())
+        owners.setdefault(key, entry.path)
+    for entry in entries:
+        folder = folder_of(entry)
         replace_allowed = entry.kind not in NEVER_REPLACED
-        existing = _already_converted(entry.path, entry.mtime, entry.kind, tag, folder)
+        key = (folder, entry.kind is FileKind.ZIP, _plain_stem(entry.path, entry.kind, tag).lower())
+        existing = _already_converted(entry.path, entry.mtime, entry.kind, tag, folder,
+                                      owns_stem=owners[key] == entry.path)
         if existing is not None:
             items.append(PlanItem(entry.path, existing, entry.kind, entry.size, entry.mtime, replace_allowed,
                                   skip_reason="already_converted"))
@@ -188,9 +214,22 @@ class Journal:
         with self._lock:
             self._db.close()
 
-    def add_plan(self, items: list[PlanItem], settings: EncodeSettings) -> None:
-        """Inscrit le plan. Un fichier déjà présent dans le journal garde son état."""
+    def add_plan(self, items: list[PlanItem], settings: EncodeSettings, options: BatchOptions | None = None) -> None:
+        """Inscrit le plan. Un fichier déjà présent dans le journal garde son état.
+
+        Le mode du lot (sens, sort des originaux, dossier miroir) est mémorisé à la première
+        inscription : les destinations ont été calculées pour ce mode, il ne doit plus changer.
+        """
         text = settings.to_json()
+        if options is not None and self.options() is None:
+            stored = {
+                "direction": options.direction, "originals": options.originals,
+                "mirror_dir": str(options.mirror_dir) if options.mirror_dir else None,
+                "confirm_replace": options.confirm_replace, "output_format": options.output_format,
+                "prefer_engine": options.prefer_engine, "skip_if_no_gain": options.skip_if_no_gain,
+            }
+            with self._lock, self._db:
+                self._db.execute("INSERT OR REPLACE INTO meta VALUES ('options', ?)", (json.dumps(stored),))
         with self._lock, self._db:
             start = self._db.execute("SELECT COALESCE(MAX(position), 0) FROM files").fetchone()[0]
             self._db.executemany(
@@ -203,6 +242,17 @@ class Journal:
                 ],
             )
             self._db.execute("INSERT OR REPLACE INTO meta VALUES ('settings', ?)", (text,))
+
+    def options(self) -> BatchOptions | None:
+        """Mode mémorisé du lot, ou None si le journal n'en a pas."""
+        with self._lock:
+            row = self._db.execute("SELECT value FROM meta WHERE key = 'options'").fetchone()
+        if not row or not row[0]:
+            return None
+        stored = json.loads(row[0])
+        if stored.get("mirror_dir"):
+            stored["mirror_dir"] = Path(stored["mirror_dir"])
+        return BatchOptions(**stored)
 
     def settings(self) -> EncodeSettings:
         with self._lock:
@@ -351,12 +401,41 @@ def _convert_item(item: PlanItem, settings: EncodeSettings, options: BatchOption
     return result
 
 
-def _already_written(item: PlanItem) -> FileResult | None:
+def recycle_bin_available(path: Path) -> bool:
+    """Vrai si le volume de ``path`` a une corbeille utilisable.
+
+    Sans corbeille (partage réseau, clé USB, volume sans dossier de corbeille), Windows supprime
+    définitivement et sans erreur ce qu'on lui demande de « recycler ». Dans le doute, on répond
+    non : l'original est alors conservé.
+    """
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+
+        root = os.path.splitdrive(os.path.abspath(str(path)))[0] + "\\"
+        if ctypes.windll.kernel32.GetDriveTypeW(root) != _DRIVE_FIXED:
+            return False
+
+        class _BinInfo(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_ulong), ("i64Size", ctypes.c_longlong), ("i64NumItems", ctypes.c_longlong)]
+
+        info = _BinInfo()
+        info.cbSize = ctypes.sizeof(_BinInfo)
+        return ctypes.windll.shell32.SHQueryRecycleBinW(root, ctypes.byref(info)) == 0
+    except Exception:
+        return False
+
+
+def _already_written(item: PlanItem, preexisting: set[Path]) -> FileResult | None:
     """Résultat d'un fichier que son processus a écrit avant de disparaître, s'il existe.
 
-    Un fichier n'est renommé à son nom définitif qu'après vérification, et reçoit la date de sa
-    source : sa présence avec cette date prouve que la conversion a abouti.
+    Un fichier n'est renommé à son nom définitif qu'après vérification et relecture, et reçoit la
+    date de sa source. S'il n'existait pas au début du lot et qu'il est là avec cette date, c'est
+    ce lot qui l'a produit. Un fichier déjà présent au début du lot ne prouve rien.
     """
+    if item.dst in preexisting:
+        return None
     try:
         source, produced = os.stat(long_path(item.src)), os.stat(long_path(item.dst))
     except OSError:
@@ -374,6 +453,31 @@ def _safe_convert(item: PlanItem, settings: EncodeSettings, options: BatchOption
         return FileResult(item.src, None, "failed", reason_for(exc), item.size, duration_s=time.perf_counter() - started)
 
 
+def _isolated_convert(item: PlanItem, settings: EncodeSettings, options: BatchOptions) -> FileResult:
+    """Convertit un fichier suspect dans un processus à lui.
+
+    Un fichier présent quand un processus de travail est mort a peut-être causé cette mort.
+    Le retenter dans le processus principal ferait tomber toute l'application, à chaque reprise.
+    Ici, s'il tue encore son processus, il est mis en échec et le lot continue.
+    """
+    crashed = FileResult(item.src, None, "failed", "worker_crashed", item.size)
+    try:
+        with _single_threaded_children(), ProcessPoolExecutor(max_workers=1) as pool:
+            try:
+                future = pool.submit(_convert_item, item, settings, options)
+            except BrokenProcessPool:
+                # Impossible de lancer le moindre processus : il ne reste que le processus principal.
+                return _safe_convert(item, settings, options)
+            try:
+                return future.result()
+            except BrokenProcessPool:
+                return crashed
+            except BaseException as exc:
+                return FileResult(item.src, None, "failed", reason_for(exc), item.size)
+    except BrokenProcessPool:
+        return crashed
+
+
 def run(
     journal: Journal,
     settings: EncodeSettings,
@@ -382,8 +486,16 @@ def run(
     stop: threading.Event | None = None,
 ) -> dict:
     """Exécute les fichiers en attente du journal ; rend le résumé. Relancer reprend là où on s'est arrêté."""
+    if options.originals == "replace" and not options.confirm_replace:
+        raise ValueError("replace_not_confirmed")
+    stored = journal.options()
+    if stored is not None and (stored.direction, stored.originals, stored.mirror_dir) != (
+            options.direction, options.originals, options.mirror_dir):
+        # Les destinations du journal ont été calculées pour un autre mode : on ne mélange pas.
+        raise ValueError("journal_mode_mismatch")
     journal.set_paused(None)
     items = journal.pending()
+    preexisting = {item.dst for item in items if os.path.lexists(long_path(item.dst))}
     small = [i for i in items if i.size < options.big_file_bytes]
     big = [i for i in items if i.size >= options.big_file_bytes]
     paused: list[str] = []
@@ -395,71 +507,87 @@ def run(
         if result.reason == "disk_full":
             paused.append("disk_full")  # le fichier reste en attente
             return
-        if result.state == "done" and options.originals == "replace" and item.replace_allowed:
-            try:
-                send2trash(str(item.src))
-            except Exception:
+        if result.state == "done" and options.originals == "replace":
+            if not item.replace_allowed or result.lossy_source:
+                # La conversion a écarté des données (textures, couleurs, triangles…) : l'original reste.
+                result.note = result.note or "replace_forbidden"
+            elif not recycle_bin_available(item.src):
                 result.note = "recycle_unavailable"  # original conservé
+            else:
+                try:
+                    send2trash(str(item.src))
+                except Exception:
+                    result.note = "recycle_unavailable"  # original conservé
         journal.record(result)
         if on_progress is not None:
             on_progress(result)
 
     workers = min(options.resolved_workers(), len(small))
-    alone: list[PlanItem] = []  # fichiers à reprendre un par un : mémoire insuffisante en parallèle
+    alone: list[PlanItem] = []  # mémoire insuffisante en parallèle : repris un par un
+    suspects: list[PlanItem] = []  # en cours quand un processus de travail est mort
+    remaining = list(small)
     if workers > 1:
         available = available_memory()
         budget = available * _MEMORY_SHARE if available else None
-        queue = list(reversed(small))
-        running: dict = {}
-        needs: dict = {}
-        try:
-            with _single_threaded_children(), ProcessPoolExecutor(max_workers=workers) as pool:
-                while True:
-                    while queue and not halted() and len(running) < workers:
-                        need = _MEMORY_BASE + queue[-1].size * _MEMORY_FACTOR
-                        if running and budget is not None and sum(needs.values()) + need > budget:
-                            break  # attendre qu'une conversion en cours libère de la mémoire
-                        item = queue[-1]
-                        future = pool.submit(_convert_item, item, settings, options)
-                        queue.pop()  # retiré seulement une fois confié au pool
-                        running[future] = item
-                        needs[future] = need
-                    if not running:
-                        break
-                    finished, _ = wait(running, return_when=FIRST_COMPLETED)
-                    for future in finished:
-                        item = running.pop(future)
-                        needs.pop(future, None)
-                        try:
-                            result = future.result()
-                        except BrokenProcessPool:
-                            alone.append(item)  # déjà retiré des conversions en cours : ne pas le perdre
-                            raise
-                        except BaseException as exc:
-                            result = FileResult(item.src, None, "failed", reason_for(exc), item.size)
-                        if result.reason == "out_of_memory":
-                            alone.append(item)
-                        else:
-                            finish(item, result)
-        except BrokenProcessPool:
-            # Un processus de travail est mort, le plus souvent faute de mémoire :
-            # tout ce qui n'a pas abouti est repris un par un.
-            alone.extend(running.values())
-            alone.extend(reversed(queue))
-            queue = []
+        restarts = 0
+        while remaining and not halted() and restarts <= _MAX_POOL_RESTARTS:
+            queue = list(reversed(remaining))
+            running: dict = {}
+            needs: dict = {}
+            try:
+                with _single_threaded_children(), ProcessPoolExecutor(max_workers=workers) as pool:
+                    while True:
+                        while queue and not halted() and len(running) < workers:
+                            need = _MEMORY_BASE + queue[-1].size * _MEMORY_FACTOR
+                            if running and budget is not None and sum(needs.values()) + need > budget:
+                                break  # attendre qu'une conversion en cours libère de la mémoire
+                            item = queue[-1]
+                            future = pool.submit(_convert_item, item, settings, options)
+                            queue.pop()  # retiré seulement une fois confié au pool
+                            running[future] = item
+                            needs[future] = need
+                        if not running:
+                            break
+                        finished, _ = wait(running, return_when=FIRST_COMPLETED)
+                        for future in finished:
+                            item = running.pop(future)
+                            needs.pop(future, None)
+                            try:
+                                result = future.result()
+                            except BrokenProcessPool:
+                                suspects.append(item)  # déjà retiré des conversions en cours : ne pas le perdre
+                                raise
+                            except BaseException as exc:
+                                result = FileResult(item.src, None, "failed", reason_for(exc), item.size)
+                            if result.reason == "out_of_memory":
+                                alone.append(item)
+                            else:
+                                finish(item, result)
+                remaining = []  # le pool est allé au bout (ou l'arrêt a été demandé)
+            except BrokenProcessPool:
+                # Un processus de travail est mort : ce qui était en cours devient suspect,
+                # le reste repart dans un pool neuf.
+                suspects.extend(running.values())
+                remaining = list(reversed(queue))
+                restarts += 1
         if halted():
-            alone = []
+            remaining, suspects, alone = [], [], []
     else:
         for item in small:
             if halted():
                 break
             finish(item, _safe_convert(item, settings, options))
-    # Ceux qui ont manqué de mémoire sont repris un par un. Un processus a pu finir d'écrire
-    # son fichier juste avant de mourir : ce fichier-là est déjà bon, on ne le refait pas.
+        remaining = []
+    # Suspects : un processus a pu finir d'écrire son fichier juste avant de mourir (il est alors
+    # bon) ; sinon le fichier est retenté dans un processus à lui.
+    for item in suspects + remaining:
+        if halted():
+            break
+        finish(item, _already_written(item, preexisting) or _isolated_convert(item, settings, options))
     for item in alone:
         if halted():
             break
-        finish(item, _already_written(item) or _safe_convert(item, settings, options))
+        finish(item, _already_written(item, preexisting) or _safe_convert(item, settings, options))
     # Les très gros fichiers passent un par un pour borner la mémoire.
     for item in big:
         if halted():

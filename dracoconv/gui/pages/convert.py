@@ -219,7 +219,7 @@ class ConvertPage(QWidget):
         folder = data_dir() / "journals"
         folder.mkdir(parents=True, exist_ok=True)
         journal = Journal(folder / f"{datetime.now():%Y%m%d-%H%M%S-%f}-{options.direction}.sqlite")
-        journal.add_plan(self._items, settings)
+        journal.add_plan(self._items, settings, options)
         self._launch(journal, settings, options)
 
     def retry_failed(self) -> None:
@@ -227,7 +227,10 @@ class ConvertPage(QWidget):
         journal = self.state.journal
         if self._worker is not None or journal is None or journal.retry_failed() == 0:
             return
-        self._launch(journal, journal.settings(), self.options())
+        # Le lot est relancé dans le mode où il a été préparé, quels que soient les boutons actuels.
+        options = journal.options() or self.options()
+        options.workers = self.workers_spin.value()
+        self._launch(journal, journal.settings(), options)
 
     def _launch(self, journal: Journal, settings: EncodeSettings, options: BatchOptions) -> None:
         self.state.journal = journal

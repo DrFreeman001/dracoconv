@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import errno
 import os
+import re
 import time
 import zipfile
 from dataclasses import dataclass
@@ -16,7 +17,9 @@ from .io.archive import EncryptedZipError, rewrite_zip
 from .io.paths import long_path
 from .io.sniff import kind_from_name
 from .mesh import Mesh, MeshReadError
-from .quality import QualityReport, error_bound_mm, float_floor_mm, measure
+import numpy as np
+
+from .quality import QualityReport, error_bound_mm, float_floor_mm, measure, quantization_step_mm
 from .settings import EncodeSettings
 
 State = Literal["done", "skipped", "failed"]
@@ -26,6 +29,7 @@ SKIP_REASONS = {
 }
 _SOURCE_KINDS = {FileKind.OBJ, FileKind.PLY}
 _MODEL_SUFFIXES = {".stl", ".obj", ".ply", ".3mf"}
+_OBJ_MATERIALS = re.compile(rb"^(mtllib|usemtl)\s", re.MULTILINE)
 _ERROR_DISK_FULL_WINDOWS = 112
 _ERROR_SHARING_VIOLATION = 32
 
@@ -90,10 +94,55 @@ def verify(source: Mesh, encoded: bytes, settings: EncodeSettings, exact_triangl
     if bits == 0:
         ok = report.max_error_mm <= float_floor_mm(expected) and decoded.triangle_count() == expected.triangle_count()
         return ok, report
-    ok = report.max_error_mm <= error_bound_mm(expected, bits) and decoded.triangle_count() <= expected.triangle_count()
+    bound = error_bound_mm(expected, bits)
+    ok = report.max_error_mm <= bound and decoded.triangle_count() <= expected.triangle_count()
+    if ok and len(decoded.positions):
+        # Sens inverse : rien dans le fichier produit ne doit se trouver loin de l'original.
+        from scipy.spatial import cKDTree
+
+        back, _ = cKDTree(expected.positions).query(decoded.positions)
+        ok = float(back.max()) <= bound
+    if ok and exact_triangles and expected.triangle_count():
+        # Seuls les triangles assez petits pour être écrasés par la grille ont le droit de disparaître.
+        ok = report.triangles_after >= report.triangles_before - _may_collapse(expected, bits)
     if expected.triangle_count() and decoded.triangle_count() == 0:
         ok = False
     return ok, report
+
+
+def _may_collapse(mesh: Mesh, bits: int) -> int:
+    """Nombre de triangles dont deux sommets sont assez proches pour tomber sur le même point de la grille."""
+    reach = 2.0 * quantization_step_mm(mesh.max_extent(), bits)
+    tris = mesh.positions[mesh.faces]
+    close = np.zeros(len(tris), dtype=bool)
+    for a, b in ((0, 1), (1, 2), (0, 2)):
+        close |= (np.abs(tris[:, a] - tris[:, b]) <= reach).all(axis=1)
+    return int(close.sum())
+
+
+def loses_data(mesh: Mesh, settings: EncodeSettings) -> bool:
+    """Vrai si ces réglages écartent des données que le fichier d'origine contient.
+
+    La vérification ne compare que la forme. Quand autre chose est perdu (triangles d'un nuage
+    de points, textures, couleurs, normales propres au fichier), l'original ne doit jamais
+    être remplacé.
+    """
+    skip = settings.skip_attributes
+    return bool(
+        (settings.point_cloud and mesh.triangle_count())
+        or (mesh.texcoords is not None and "texcoord" in skip)
+        or (mesh.colors is not None and "color" in skip)
+        or (mesh.normals is not None and "normal" in skip)
+    )
+
+
+def decoding_loses_data(mesh: Mesh, fmt: str) -> bool:
+    """Vrai si le format de sortie ne peut pas porter tout ce que le .drc contient."""
+    if fmt == "stl":
+        return mesh.texcoords is not None or mesh.colors is not None or mesh.normals is not None
+    if fmt == "obj":
+        return mesh.colors is not None
+    return False
 
 
 def _wants_source_file(settings: EncodeSettings) -> bool:
@@ -142,6 +191,15 @@ def write_atomic(dst: Path, data: bytes, mtime: float | None = None) -> None:
     try:
         with _open_part(part) as f:
             f.write(data)
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except (AttributeError, OSError, ValueError):
+                pass
+        # Relecture : le contenu a été vérifié en mémoire, encore faut-il qu'il soit bien sur le disque.
+        with open(long_path(part), "rb") as f:
+            if f.read() != data:
+                raise VerifyError("le fichier relu diffère de ce qui a été écrit")
         if mtime is not None:
             os.utime(long_path(part), (mtime, mtime))
         os.rename(long_path(part), long_path(dst))  # échoue si dst est apparu entre-temps
@@ -209,6 +267,7 @@ def encode_file(
         kind = detect_kind(src)
         lossy = kind in LOSSY_KINDS
         mesh = mesh_from_bytes(kind, raw)
+        lossy = lossy or loses_data(mesh, settings) or (kind is FileKind.OBJ and bool(_OBJ_MATERIALS.search(raw)))
         del raw
         mesh.source_path = src
         data, report = encode_bytes(mesh, settings, prefer_engine, source_path=src, source_kind=kind)
@@ -221,15 +280,22 @@ def encode_file(
         return _failure(src, exc, size_before, started, lossy_source=lossy)
 
 
-def decode_bytes(data: bytes, fmt: Literal["stl", "obj", "ply"]) -> bytes:
-    """Décode un .drc vers le format demandé et vérifie que le résultat se relit à l'identique."""
+def decode_checked(data: bytes, fmt: Literal["stl", "obj", "ply"]) -> tuple[bytes, bool]:
+    """Décode un .drc vers le format demandé et vérifie que le résultat se relit à l'identique.
+
+    Rend le contenu produit, et si ce format laisse de côté des données du .drc.
+    """
     mesh = decoder().decode(data)
     mesh.validate()
     out = mesh_to_bytes(mesh, fmt)
     back = mesh_from_bytes(kind_from_name("x." + fmt), out)
     if not measure(mesh, back, integrity=False).identical:
         raise VerifyError("le fichier décodé ne se relit pas à l'identique")
-    return out
+    return out, decoding_loses_data(mesh, fmt)
+
+
+def decode_bytes(data: bytes, fmt: Literal["stl", "obj", "ply"]) -> bytes:
+    return decode_checked(data, fmt)[0]
 
 
 def decode_file(src: Path, dst: Path, fmt: Literal["stl", "obj", "ply"]) -> FileResult:
@@ -242,9 +308,9 @@ def decode_file(src: Path, dst: Path, fmt: Literal["stl", "obj", "ply"]) -> File
             raise FileExistsError(str(dst))
         raw, mtime = _read(src)
         size_before = len(raw)
-        out = decode_bytes(raw, fmt)
+        out, lossy = decode_checked(raw, fmt)
         write_atomic(dst, out, mtime)
-        return _result(src, dst, "done", None, size_before, started, size_after=len(out))
+        return _result(src, dst, "done", None, size_before, started, size_after=len(out), lossy_source=lossy)
     except (MeshReadError, EngineError, VerifyError, OSError, MemoryError) as exc:
         return _failure(src, exc, size_before, started)
 

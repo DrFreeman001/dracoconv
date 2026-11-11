@@ -113,8 +113,8 @@
   "reason.unsafe_zip_entry": "archive entry with an unsafe path",
   "reason.nested_zip": "nested archive, copied as is",
   "reason.zip_without_models": "archive without any 3D model",
-  "reason.recycle_unavailable": "recycle bin unavailable, original kept",
-  "reason.replace_forbidden": "replacement not allowed for this file type",
+  "reason.recycle_unavailable": "original kept: no usable recycle bin on this volume",
+  "reason.replace_forbidden": "original kept: converting leaves out data from this file (textures, colours, normals, materials or triangles)",
   "reason.engine_unavailable": "required Draco engine unavailable",
   "reason.engine_error": "Draco engine error",
   "reason.already_converted": "already converted in an earlier run",
@@ -301,7 +301,7 @@
   "gui.convert.replace": "Replace: the original goes to the recycle bin after verification",
   "gui.convert.mirror_dir": "Mirror folder",
   "gui.convert.browse": "Browse…",
-  "gui.convert.replace_confirm": "I confirm: verified originals will be sent to the recycle bin (never 3MF or ZIP files)",
+  "gui.convert.replace_confirm": "I confirm: verified originals will be sent to the recycle bin. Never 3MF or ZIP files, nor files whose conversion leaves data out. If the bin overflows, Windows purges its oldest items.",
   "gui.convert.workers": "Parallel conversions",
   "gui.convert.format": "Output format",
   "gui.convert.format.stl": "Binary STL",
@@ -337,5 +337,7 @@
   "kind.gcode_3mf": "Sliced prints",
   "kind.compiler_obj": "Compiler files",
   "kind.unknown": "Other",
-  "cli.quality.split": "Vertices split by Draco: {n} (surface not watertight to begin with; a slicer may see extra open edges — \"Preserve order\" avoids it, at the cost of a larger file)"
+  "cli.quality.split": "Vertices split by Draco: {n} (surface not watertight to begin with; a slicer may see extra open edges — \"Preserve order\" avoids it, at the cost of a larger file)",
+  "reason.worker_crashed": "the engine crashed on this file",
+  "cli.error.journal_mode": "This journal was prepared for another mode (direction, originals or mirror folder). Resume it with the same options, or use a new journal."
 }

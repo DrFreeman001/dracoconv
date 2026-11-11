@@ -113,8 +113,8 @@
   "reason.unsafe_zip_entry": "entrée d'archive au chemin dangereux",
   "reason.nested_zip": "archive imbriquée, recopiée telle quelle",
   "reason.zip_without_models": "archive sans modèle 3D",
-  "reason.recycle_unavailable": "corbeille indisponible, original conservé",
-  "reason.replace_forbidden": "remplacement interdit pour ce type de fichier",
+  "reason.recycle_unavailable": "original conservé : pas de corbeille utilisable sur ce volume",
+  "reason.replace_forbidden": "original conservé : la conversion écarte des données de ce fichier (textures, couleurs, normales, matériaux ou triangles)",
   "reason.engine_unavailable": "moteur Draco requis indisponible",
   "reason.engine_error": "erreur du moteur Draco",
   "reason.already_converted": "déjà converti lors d'un passage précédent",
@@ -301,7 +301,7 @@
   "gui.convert.replace": "Remplacer : l'original part à la corbeille après vérification",
   "gui.convert.mirror_dir": "Dossier miroir",
   "gui.convert.browse": "Parcourir…",
-  "gui.convert.replace_confirm": "Je confirme : les originaux vérifiés seront envoyés à la corbeille (jamais les 3MF ni les ZIP)",
+  "gui.convert.replace_confirm": "Je confirme : les originaux vérifiés seront envoyés à la corbeille. Jamais les 3MF, les ZIP, ni les fichiers dont la conversion écarte des données. Si la corbeille déborde, Windows en purge les plus anciens éléments.",
   "gui.convert.workers": "Conversions en parallèle",
   "gui.convert.format": "Format de sortie",
   "gui.convert.format.stl": "STL binaire",
@@ -337,5 +337,7 @@
   "kind.gcode_3mf": "Impressions tranchées",
   "kind.compiler_obj": "Fichiers de compilateur",
   "kind.unknown": "Autres",
-  "cli.quality.split": "Sommets dédoublés par Draco : {n} (surface non étanche à l'origine ; un slicer peut y voir des arêtes ouvertes en plus — « Conserver l'ordre » l'évite, au prix d'un fichier plus gros)"
+  "cli.quality.split": "Sommets dédoublés par Draco : {n} (surface non étanche à l'origine ; un slicer peut y voir des arêtes ouvertes en plus — « Conserver l'ordre » l'évite, au prix d'un fichier plus gros)",
+  "reason.worker_crashed": "le moteur s'est arrêté brutalement sur ce fichier",
+  "cli.error.journal_mode": "Ce journal a été préparé pour un autre mode (sens, sort des originaux ou dossier miroir). Reprenez-le avec les mêmes options, ou utilisez un nouveau journal."
 }

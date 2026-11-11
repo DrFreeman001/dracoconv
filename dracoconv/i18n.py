@@ -61,6 +61,19 @@ def tr(key: str, **fmt) -> str:
     return tr_in(_current, key, **fmt)
 
 
+def reason_text(code: str) -> str:
+    """Texte d'une raison. Une note d'archive (« nom: raison, nom: raison ») est traduite morceau par morceau."""
+    catalog = _catalog(_current)
+    if "reason." + code in catalog:
+        return catalog["reason." + code]
+    parts = []
+    for part in code.split(", "):
+        name, separator, reason = part.rpartition(": ")
+        translated = catalog.get("reason." + reason)
+        parts.append(f"{name}{separator}{translated}" if separator and translated else part)
+    return ", ".join(parts)
+
+
 def format_size(size: float) -> str:
     """Taille lisible : « 73,6 Go » en français, « 73.6 GB » en anglais."""
     value = float(size)

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...batch import Journal
-from ...i18n import format_size, tr
+from ...i18n import format_size, reason_text, tr
 
 _FILTERS = (None, "done", "skipped", "failed", "pending")
 _MAX_ROWS = 2000
@@ -80,7 +80,7 @@ class JournalPage(QWidget):
             reason = record["reason"] or record["note"]
             after = format_size(record["size_after"]) if record["size_after"] is not None else ""
             values = (record["src"], record["dst"] if record["state"] == "done" else "",
-                      tr("state." + record["state"]), tr("reason." + reason) if reason else "",
+                      tr("state." + record["state"]), reason_text(reason) if reason else "",
                       format_size(record["size_before"] or 0), after)
             row = self.table.rowCount()
             self.table.insertRow(row)
