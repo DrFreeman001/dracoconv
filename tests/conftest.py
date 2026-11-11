@@ -136,3 +136,37 @@ def make_two_cube_3mf(tmp_path, cube: Mesh) -> Path:
     p = Path(tmp_path) / "two.3mf"
     p.write_bytes(scene.export(file_type="3mf"))
     return p
+
+
+def obj_bytes(mesh: Mesh) -> bytes:
+    lines = [f"v {float(x)!r} {float(y)!r} {float(z)!r}" for x, y, z in mesh.positions]
+    lines += [f"f {a + 1} {b + 1} {c + 1}" for a, b, c in mesh.faces]
+    return ("\n".join(lines) + "\n").encode("ascii")
+
+
+def make_zip(path, entries: dict) -> Path:
+    import zipfile
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in entries.items():
+            z.writestr(name, data)
+    return Path(path)
+
+
+COMPILER_OBJ_BYTES = b"\x64\x86\x02\x00" + b"\0" * 60
+
+
+@pytest.fixture
+def model_tree(tmp_path) -> Path:
+    """3 STL, 1 OBJ, 1 .obj de compilateur, 1 ZIP (2 STL + 1 txt), 1 txt."""
+    root = Path(tmp_path) / "models"
+    (root / "sub").mkdir(parents=True)
+    small, medium = make_sphere(2, 30.0), make_sphere(3, 40.0)
+    write_binary_stl(root / "a.stl", small)
+    write_binary_stl(root / "sub" / "b.stl", medium)
+    write_ascii_stl(root / "sub" / "c.stl", small)
+    (root / "d.obj").write_bytes(obj_bytes(medium))
+    (root / "build.obj").write_bytes(COMPILER_OBJ_BYTES)
+    make_zip(root / "pack.zip", {"x/one.stl": stl_bytes(small), "two.stl": stl_bytes(medium), "lisezmoi.txt": b"bonjour"})
+    (root / "notes.txt").write_text("rien", encoding="ascii")
+    return root
