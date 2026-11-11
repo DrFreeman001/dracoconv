@@ -72,11 +72,11 @@
   "param.preserve_order.help_orca": "Pas de réglage équivalent dans OrcaSlicer.",
 
   "param.metadata.label": "Métadonnées",
-  "param.metadata.tooltip": "Inscrit le nom et le format du fichier d'origine dans le .drc.",
-  "param.metadata.help_what": "Ajoute au fichier .drc une petite fiche : nom et format du fichier d'origine. Elle aide à retrouver la provenance d'un fichier isolé.",
-  "param.metadata.help_size": "Quelques dizaines d'octets par fichier, négligeable.",
+  "param.metadata.tooltip": "Conserve dans le .drc les noms d'objets, de groupes et de matériaux d'un fichier OBJ.",
+  "param.metadata.help_what": "Un fichier OBJ peut nommer ses objets, ses groupes et ses matériaux. Avec cette option, l'encodeur officiel de Draco conserve ces noms dans le .drc au lieu de les abandonner. Sans effet sur un STL, qui ne contient rien de tel.",
+  "param.metadata.help_size": "Quelques octets par nom, négligeable.",
   "param.metadata.help_quality": "Aucun effet sur la géométrie.",
-  "param.metadata.help_recommended": "Décoché par défaut : le journal de conversion garde déjà la provenance. Cochez si vos .drc doivent circuler seuls.",
+  "param.metadata.help_recommended": "Décoché pour l'impression. Cochez si vos OBJ sont organisés en groupes ou en matériaux que vous voulez retrouver.",
   "param.metadata.help_orca": "Pas de réglage équivalent dans OrcaSlicer, qui ignore ces informations à l'ouverture.",
 
   "param.preserve_polygons.label": "Conserver les polygones",
