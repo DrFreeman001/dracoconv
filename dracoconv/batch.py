@@ -10,6 +10,7 @@ import threading
 import time
 from collections import Counter
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
@@ -27,6 +28,11 @@ from .settings import EncodeSettings
 #: Types dont l'original n'est jamais remplacé : la conversion y perd des données.
 NEVER_REPLACED = {FileKind.THREEMF, FileKind.ZIP}
 _MTIME_TOLERANCE_S = 0.001
+# Mémoire estimée d'une conversion : une base par processus, plus un multiple de la taille du fichier
+# (lecture, fusion des sommets, encodage, relecture de vérification).
+_MEMORY_BASE = 300 << 20
+_MEMORY_FACTOR = 20
+_MEMORY_SHARE = 0.6  # part de la mémoire disponible que le lot s'autorise
 _SAME_MTIME_S = 2.0  # certains systèmes de fichiers arrondissent les dates à 2 secondes
 _STRIPPED_SUFFIXES = {".stl", ".obj", ".ply", ".3mf", ".drc"}
 
@@ -270,6 +276,35 @@ class Journal:
                 writer.writerow([r[c] for c in _CSV_COLUMNS])
 
 
+def available_memory() -> int | None:
+    """Mémoire que Windows accepte encore de réserver, en octets ; None si inconnue.
+
+    C'est la limite de réservation (« commit ») qui compte, pas la mémoire physique libre :
+    sans fichier d'échange, elle peut être épuisée alors qu'il reste de la mémoire physique.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+
+        class _Status(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = _Status()
+        status.dwLength = ctypes.sizeof(_Status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return int(min(status.ullAvailPageFile, status.ullAvailPhys))
+    except Exception:
+        return None
+
+
 def _convert_item(item: PlanItem, settings: EncodeSettings, options: BatchOptions) -> FileResult:
     """Convertit un fichier du plan. Exécuté dans un processus de travail ou dans le processus principal."""
     changed = False
@@ -331,33 +366,56 @@ def run(
             on_progress(result)
 
     workers = min(options.resolved_workers(), len(small))
+    alone: list[PlanItem] = []  # fichiers à reprendre un par un : mémoire insuffisante en parallèle
     if workers > 1:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            queue = iter(small)
-            running: dict = {}
-            while True:
-                while not halted() and len(running) < workers * 2:
-                    item = next(queue, None)
-                    if item is None:
+        available = available_memory()
+        budget = available * _MEMORY_SHARE if available else None
+        queue = list(reversed(small))
+        running: dict = {}
+        needs: dict = {}
+        try:
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                while True:
+                    while queue and not halted() and len(running) < workers:
+                        need = _MEMORY_BASE + queue[-1].size * _MEMORY_FACTOR
+                        if running and budget is not None and sum(needs.values()) + need > budget:
+                            break  # attendre qu'une conversion en cours libère de la mémoire
+                        item = queue[-1]
+                        future = pool.submit(_convert_item, item, settings, options)
+                        queue.pop()  # retiré seulement une fois confié au pool
+                        running[future] = item
+                        needs[future] = need
+                    if not running:
                         break
-                    running[pool.submit(_convert_item, item, settings, options)] = item
-                if not running:
-                    break
-                finished, _ = wait(running, return_when=FIRST_COMPLETED)
-                for future in finished:
-                    item = running.pop(future)
-                    try:
-                        result = future.result()
-                    except Exception as exc:
-                        result = FileResult(item.src, None, "failed", reason_for(exc), item.size)
-                    finish(item, result)
+                    finished, _ = wait(running, return_when=FIRST_COMPLETED)
+                    for future in finished:
+                        item = running.pop(future)
+                        needs.pop(future, None)
+                        try:
+                            result = future.result()
+                        except BrokenProcessPool:
+                            raise
+                        except BaseException as exc:
+                            result = FileResult(item.src, None, "failed", reason_for(exc), item.size)
+                        if result.reason == "out_of_memory":
+                            alone.append(item)
+                        else:
+                            finish(item, result)
+        except BrokenProcessPool:
+            # Un processus de travail est mort, le plus souvent faute de mémoire :
+            # tout ce qui n'a pas abouti est repris un par un.
+            alone.extend(running.values())
+            alone.extend(reversed(queue))
+            queue = []
+        if halted():
+            alone = []
     else:
         for item in small:
             if halted():
                 break
             finish(item, _safe_convert(item, settings, options))
-    # Les très gros fichiers passent un par un pour borner la mémoire.
-    for item in big:
+    # Les très gros fichiers, et ceux qui ont manqué de mémoire, passent un par un.
+    for item in alone + big:
         if halted():
             break
         finish(item, _safe_convert(item, settings, options))

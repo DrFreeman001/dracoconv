@@ -83,6 +83,9 @@ def _entry(path_text: str, stat: os.stat_result, options: ScanOptions, inventory
     kind = kind_from_name(os.path.basename(path_text))
     if kind is FileKind.UNKNOWN:
         return None
+    if kind is FileKind.GCODE_3MF:
+        inventory.ignored["gcode_3mf"] += 1
+        return None
     path = Path(path_text[4:] if path_text.startswith("\\\\?\\") and not path_text.startswith("\\\\?\\UNC") else path_text)
     if kind is FileKind.OBJ:
         kind = detect_kind(path)

@@ -331,5 +331,10 @@
   "gui.journal.col.state": "État",
   "gui.journal.col.reason": "Raison",
   "gui.journal.col.before": "Avant",
-  "gui.journal.col.after": "Après"
+  "gui.journal.col.after": "Après",
+  "reason.gcode_3mf": "impression déjà tranchée (.gcode.3mf), pas un modèle",
+  "reason.unsupported_3mf": "3MF de projet (Bambu Studio, OrcaSlicer) non pris en charge, laissé tel quel",
+  "kind.gcode_3mf": "Impressions tranchées",
+  "kind.compiler_obj": "Fichiers de compilateur",
+  "kind.unknown": "Autres"
 }

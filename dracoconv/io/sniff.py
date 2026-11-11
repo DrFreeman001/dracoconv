@@ -15,6 +15,7 @@ class FileKind(str, Enum):
     ZIP = "zip"
     DRC = "drc"
     COMPILER_OBJ = "compiler_obj"
+    GCODE_3MF = "gcode_3mf"  # impression déjà tranchée (.gcode.3mf) : du G-code, pas un modèle
     UNKNOWN = "unknown"
 
 
@@ -33,6 +34,8 @@ SNIFF_BYTES = 96
 
 
 def kind_from_name(name: str) -> FileKind:
+    if name.lower().endswith(".gcode.3mf"):
+        return FileKind.GCODE_3MF
     return _BY_EXTENSION.get(PurePosixPath(name.replace("\\", "/")).suffix.lower(), FileKind.UNKNOWN)
 
 

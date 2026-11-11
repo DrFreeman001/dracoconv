@@ -250,6 +250,96 @@ def test_decoding_next_to_the_untouched_original_is_skipped(model_tree):
     assert (model_tree / "d.stl").exists() and not (model_tree / "a (1).stl").exists()
 
 
+class _InlinePool:
+    """Remplace le pool de processus par des fils, pour observer l'ordonnancement depuis le test."""
+
+    def __init__(self, max_workers=None):
+        from concurrent.futures import ThreadPoolExecutor
+
+        self._pool = ThreadPoolExecutor(max_workers)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._pool.shutdown(wait=True)
+
+    def submit(self, fn, *args):
+        return self._pool.submit(fn, *args)
+
+
+def test_out_of_memory_in_parallel_phase_is_retried_alone(model_tree, monkeypatch):
+    calls: dict = {}
+    real = batch._convert_item
+    lock = threading.Lock()
+
+    def flaky(item, settings, options):
+        with lock:
+            calls[item.src] = calls.get(item.src, 0) + 1
+            first = calls[item.src] == 1
+        if first:
+            raise MemoryError("bad allocation")
+        return real(item, settings, options)
+
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", _InlinePool)
+    monkeypatch.setattr(batch, "_convert_item", flaky)
+    s = run_batch(model_tree, workers=4).summary()
+    assert s["done"] == 5 and s["failed"] == 0 and set(calls.values()) == {2}
+
+
+def test_memory_error_twice_is_a_failure(model_tree, monkeypatch):
+    def always(item, settings, options):
+        raise MemoryError("bad allocation")
+
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", _InlinePool)
+    monkeypatch.setattr(batch, "_convert_item", always)
+    s = run_batch(model_tree, workers=4).summary()
+    assert s["failed"] == 5 and s["reasons"] == {"out_of_memory": 5}
+
+
+def test_broken_pool_falls_back_to_one_by_one(model_tree, monkeypatch):
+    from concurrent.futures.process import BrokenProcessPool
+
+    class Broken(_InlinePool):
+        def submit(self, fn, *args):
+            raise BrokenProcessPool("un processus de travail est mort")
+
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", Broken)
+    s = run_batch(model_tree, workers=4).summary()
+    assert s["done"] == 5 and s["failed"] == 0
+
+
+def test_memory_budget_limits_concurrency(model_tree, monkeypatch):
+    active, peak = [0], [0]
+    real = batch._convert_item
+    lock = threading.Lock()
+
+    def tracked(item, settings, options):
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        try:
+            return real(item, settings, options)
+        finally:
+            with lock:
+                active[0] -= 1
+
+    monkeypatch.setattr(batch, "ProcessPoolExecutor", _InlinePool)
+    monkeypatch.setattr(batch, "_convert_item", tracked)
+    monkeypatch.setattr(batch, "available_memory", lambda: 1000)  # presque rien : un seul fichier à la fois
+    s = run_batch(model_tree, workers=4).summary()
+    assert s["done"] == 5 and peak[0] == 1
+    monkeypatch.setattr(batch, "available_memory", lambda: 1 << 40)
+    for p in list(model_tree.rglob("*.drc")) + list(model_tree.rglob("*.drc.zip")):
+        p.unlink()
+    peak[0] = 0
+    assert run_batch(model_tree, workers=4).summary()["done"] == 5 and peak[0] > 1
+
+
+def test_available_memory_is_plausible():
+    assert batch.available_memory() is None or batch.available_memory() > 1 << 20
+
+
 def test_default_workers_is_half_the_cores():
     assert BatchOptions().resolved_workers() == max(1, (os.cpu_count() or 2) // 2)
     assert BatchOptions(workers=3).resolved_workers() == 3

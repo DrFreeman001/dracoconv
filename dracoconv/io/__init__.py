@@ -27,8 +27,8 @@ _TO_BYTES = {"stl": stl_to_bytes, "obj": obj_to_bytes, "ply": ply_to_bytes}
 
 
 def mesh_from_bytes(kind: FileKind, data: bytes) -> Mesh:
-    if kind is FileKind.COMPILER_OBJ:
-        raise MeshReadError("compiler_obj")
+    if kind in (FileKind.COMPILER_OBJ, FileKind.GCODE_3MF):
+        raise MeshReadError(kind.value)
     reader = _FROM_BYTES.get(kind)
     if reader is None:
         raise MeshReadError("unsupported", kind.value)

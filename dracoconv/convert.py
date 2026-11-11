@@ -21,7 +21,9 @@ from .settings import EncodeSettings
 
 State = Literal["done", "skipped", "failed"]
 #: Raisons qui écartent un fichier sans que ce soit une erreur.
-SKIP_REASONS = {"empty", "compiler_obj", "no_gain", "encrypted_zip", "zip_without_models"}
+SKIP_REASONS = {
+    "empty", "compiler_obj", "gcode_3mf", "unsupported_3mf", "no_gain", "encrypted_zip", "zip_without_models",
+}
 _SOURCE_KINDS = {FileKind.OBJ, FileKind.PLY}
 _MODEL_SUFFIXES = {".stl", ".obj", ".ply", ".3mf"}
 _ERROR_DISK_FULL_WINDOWS = 112

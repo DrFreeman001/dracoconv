@@ -331,5 +331,10 @@
   "gui.journal.col.state": "State",
   "gui.journal.col.reason": "Reason",
   "gui.journal.col.before": "Before",
-  "gui.journal.col.after": "After"
+  "gui.journal.col.after": "After",
+  "reason.gcode_3mf": "already sliced print (.gcode.3mf), not a model",
+  "reason.unsupported_3mf": "project 3MF (Bambu Studio, OrcaSlicer) not supported, left as is",
+  "kind.gcode_3mf": "Sliced prints",
+  "kind.compiler_obj": "Compiler files",
+  "kind.unknown": "Other"
 }
