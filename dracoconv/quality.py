@@ -83,6 +83,15 @@ def _integrity(mesh: "Mesh") -> tuple[bool, float | None]:
     return watertight, float(tm.volume) if watertight else None
 
 
+def _split_vertices(source: "Mesh", decoded: "Mesh") -> int:
+    """Nombre de sommets que Draco a ajoutés en dédoublant ceux de la source.
+
+    Draco ne fusionne jamais deux sommets, même quand la grille de quantification les amène au
+    même point : tout sommet en plus au décodage est donc un sommet dédoublé.
+    """
+    return max(0, len(decoded.positions) - len(source.positions))
+
+
 def _surface_points(mesh: "Mesh") -> np.ndarray:
     """Sommets qui portent réellement la surface.
 
@@ -131,7 +140,7 @@ def measure(source: "Mesh", decoded: "Mesh", integrity: bool = True) -> QualityR
         vertices_merged=max(0, len(np.unique(source.positions, axis=0)) - len(np.unique(decoded.positions, axis=0)))
         if not identical else 0,
         identical=identical,
-        vertices_split=max(0, len(decoded.positions) - len(source.positions)) if source.triangle_count() else 0,
+        vertices_split=_split_vertices(source, decoded) if source.triangle_count() else 0,
     )
     if integrity:
         report.watertight_before, volume_before = _integrity(source)

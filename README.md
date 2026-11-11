@@ -17,7 +17,7 @@ Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'o
 - **Un original n'est jamais touché par défaut.** Le mode « remplacer » doit être confirmé et envoie l'original à la corbeille seulement après vérification et relecture du fichier écrit. Il ne s'applique jamais aux 3MF, aux ZIP, ni à un fichier dont la conversion écarte des données (textures, couleurs, normales ou matériaux d'un OBJ, par exemple). Sur un volume sans corbeille (réseau, clé USB), l'original est conservé.
 - **La corbeille a une taille limite.** Quand elle déborde, Windows en purge les éléments les plus anciens sans prévenir. Avant de remplacer des dizaines de gigaoctets, vérifiez sa taille maximale dans ses propriétés, ou préférez le mode miroir.
 - **3MF : la conversion perd des données** (plateaux, réglages d'impression, couleurs, séparation des objets) et fait rarement gagner de la place, un 3MF étant déjà compressé. Les projets Bambu Studio et OrcaSlicer ne sont pas lus et sont laissés tels quels. Les fichiers `.gcode.3mf` sont ignorés.
-- **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors plus d'arêtes ouvertes que dans le STL d'origine. Le réglage « Conserver l'ordre » l'évite, au prix d'un fichier environ deux fois plus gros. La commande `quality` signale les fichiers concernés. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
+- **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, l'encodage le plus compact de Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors bien plus d'arêtes ouvertes que dans le STL d'origine. Le réglage **« Préserver la topologie »**, coché par défaut, détecte ces modèles et les encode autrement : OrcaSlicer les lit alors comme le STL, mais ils pèsent environ deux fois plus. Sur une collection de figurines, où presque rien n'est étanche, cela change beaucoup le gain : 30 % de la taille d'origine au lieu de 12 % sur le dossier d'essai. Décochez-le (`--no-keep-topology`) pour une archive la plus compacte possible, à reconvertir en STL avant usage. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
 - **Au-delà de 22 bits environ, quantifier ne gagne plus en précision** pour un modèle de taille courante : la limite devient celle des nombres du fichier d'origine.
 
 ## Installation
@@ -133,6 +133,7 @@ Relancer `encode` sur un dossier déjà traité ne refait rien : un fichier prod
 | `--skip` | Attributs à ne pas enregistrer : `normal`, `texcoord`, `color`, `generic`, ou `none`. | `normal` |
 | `--point-cloud` | Enregistre les sommets sans les triangles. | non |
 | `--preserve-order` | Garde l'ordre des sommets et des triangles ; fichier plus gros. | non |
+| `--keep-topology` | Sur un modèle non étanche, garde chaque sommet unique ; fichier plus gros pour ces modèles. | oui |
 | `--metadata` | Conserve les noms d'objets, de groupes et de matériaux d'un OBJ. | non |
 | `--preserve-polygons` | Conserve les faces à quatre côtés ou plus d'un OBJ ou PLY. | non |
 

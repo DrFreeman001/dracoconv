@@ -252,7 +252,7 @@ class SettingsPage(QWidget):
             if value == getattr(defaults, spec.id):
                 continue
             if spec.type == "bool":
-                parts.append(spec.cli_flag)
+                parts.append(spec.cli_flag if value else "--no-" + spec.cli_flag[2:])
             elif spec.type == "set":
                 parts += [spec.cli_flag, ",".join(sorted(value)) or "none"]
             else:

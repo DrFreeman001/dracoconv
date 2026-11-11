@@ -55,6 +55,7 @@ _SPECS = (
     ParamSpec("skip_attributes", "set", frozenset({"normal"}), "--skip", "--skip", choices=SKIPPABLE),
     ParamSpec("point_cloud", "bool", False, "--point-cloud", "-point_cloud"),
     ParamSpec("preserve_order", "bool", False, "--preserve-order", None),
+    ParamSpec("keep_topology", "bool", True, "--keep-topology", None),
     ParamSpec("metadata", "bool", False, "--metadata", "--metadata"),
     ParamSpec("preserve_polygons", "bool", False, "--preserve-polygons", "-preserve_polygons"),
 )

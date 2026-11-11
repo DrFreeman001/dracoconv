@@ -17,7 +17,7 @@ Built to archive a collection of 3D-printing models: the `.drc` files open in Or
 - **An original is never touched by default.** "Replace" mode must be confirmed and sends the original to the recycle bin only after verification and a read-back of the written file. It never applies to 3MF or ZIP files, nor to a file whose conversion leaves data out (textures, colours, normals or materials of an OBJ, for example). On a volume without a recycle bin (network, USB stick), the original is kept.
 - **The recycle bin has a size limit.** When it overflows, Windows purges its oldest items without warning. Before replacing tens of gigabytes, check its maximum size in its properties, or prefer mirror mode.
 - **3MF: conversion loses data** (plates, print settings, colours, object separation) and rarely saves space, since a 3MF is already compressed. Bambu Studio and OrcaSlicer project files are not read and are left as they are. `.gcode.3mf` files are ignored.
-- **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts more open edges than in the original STL. The "Preserve order" setting avoids this, at the cost of a file roughly twice as large. The `quality` command flags the affected files. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
+- **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco's most compact encoding duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts many more open edges than in the original STL. The **"Keep topology"** setting, on by default, detects those models and encodes them differently: OrcaSlicer then reads them like the STL, but they are roughly twice as large. On a collection of figurines, where almost nothing is watertight, this changes the savings a lot: 30% of the original size instead of 12% on the test folder. Turn it off (`--no-keep-topology`) for the most compact archive, to be converted back to STL before use. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
 - **Beyond about 22 bits, quantizing gains no more precision** for a model of ordinary size: the limit becomes that of the numbers in the original file.
 
 ## Installation
@@ -133,6 +133,7 @@ Running `encode` again on a folder that was already processed redoes nothing: a 
 | `--skip` | Attributes to leave out: `normal`, `texcoord`, `color`, `generic`, or `none`. | `normal` |
 | `--point-cloud` | Stores vertices without triangles. | no |
 | `--preserve-order` | Keeps the order of vertices and triangles; larger file. | no |
+| `--keep-topology` | On a non-watertight model, keeps every vertex unique; larger file for those models. | yes |
 | `--metadata` | Keeps the object, group and material names of an OBJ. | no |
 | `--preserve-polygons` | Keeps faces with four or more sides from an OBJ or PLY. | no |
 

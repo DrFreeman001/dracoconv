@@ -6,7 +6,7 @@ import os
 import re
 import time
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -170,6 +170,19 @@ def encode_bytes(
     ok, report = verify(mesh, data, settings, exact_triangles=not from_source)
     if not ok:
         raise VerifyError(f"écart {report.max_error_mm:.6g} mm, {report.triangles_after}/{report.triangles_before} triangles")
+    if (settings.keep_topology and report.vertices_split and not settings.preserve_order
+            and not settings.point_cloud and not from_source):
+        # Surface non étanche : l'encodage compact de Draco y dédouble des sommets, et un slicer
+        # y voit alors des arêtes ouvertes en plus. On réencode ce modèle-là en conservant l'ordre,
+        # ce qui garde chaque sommet unique, au prix d'un fichier plus gros.
+        ordered = replace(settings, preserve_order=True)
+        try:
+            safer = select_engine(ordered, prefer_engine, extent).encode(mesh, ordered)
+            safer_ok, safer_report = verify(mesh, safer, ordered)
+        except EngineError:
+            safer_ok = False  # moteur imposé incapable de conserver l'ordre : on garde le premier encodage
+        if safer_ok and safer_report.vertices_split == 0:
+            return safer, safer_report
     return data, report
 
 

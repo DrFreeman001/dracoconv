@@ -4,7 +4,9 @@ Relevées le 2026-11-11 sur une collection de modèles d'impression 3D (Windows 
 
 ## 1. Essai complet sur un dossier
 
-Dossier de 36 fichiers, dont 15 STL et 14 fichiers 3MF (parmi lesquels 8 `.gcode.3mf`). Réglages par défaut (sans quantification, niveau 10). Conversion vers un dossier miroir, puis retour en STL.
+Dossier de 36 fichiers, dont 15 STL et 14 fichiers 3MF (parmi lesquels 8 `.gcode.3mf`). Sans quantification, niveau 10, **« Préserver la topologie » décoché** : cet essai a été fait avant l'ajout de ce réglage, aujourd'hui coché par défaut. Conversion vers un dossier miroir, puis retour en STL.
+
+Avec « Préserver la topologie » coché (le défaut actuel), les mêmes 15 STL donnent **184,2 Mo, soit 29,7 % de la taille d'origine**, au lieu de 76,4 Mo : la plupart de ces modèles ne sont pas étanches et sont donc réencodés sans dédoublement de sommets. C'est le prix d'un `.drc` qu'OrcaSlicer lit comme le STL d'origine (voir section 2).
 
 | Étape | Résultat |
 |---|---|

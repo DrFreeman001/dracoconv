@@ -339,5 +339,12 @@
   "kind.unknown": "Autres",
   "cli.quality.split": "Sommets dédoublés par Draco : {n} (surface non étanche à l'origine ; un slicer peut y voir des arêtes ouvertes en plus — « Conserver l'ordre » l'évite, au prix d'un fichier plus gros)",
   "reason.worker_crashed": "le moteur s'est arrêté brutalement sur ce fichier",
-  "cli.error.journal_mode": "Ce journal a été préparé pour un autre mode (sens, sort des originaux ou dossier miroir). Reprenez-le avec les mêmes options, ou utilisez un nouveau journal."
+  "cli.error.journal_mode": "Ce journal a été préparé pour un autre mode (sens, sort des originaux ou dossier miroir). Reprenez-le avec les mêmes options, ou utilisez un nouveau journal.",
+  "param.keep_topology.label": "Préserver la topologie",
+  "param.keep_topology.tooltip": "Sur un modèle non étanche, garde chaque sommet unique pour qu'un slicer n'y voie pas d'arêtes ouvertes en plus ; fichier plus gros pour ces modèles-là.",
+  "param.keep_topology.help_what": "Quand une surface n'est pas étanche, l'encodage le plus compact de Draco dédouble certains sommets. Les triangles restent identiques, mais un slicer qui relie les triangles par numéro de sommet compte alors bien plus d'arêtes ouvertes. Avec ce réglage, le logiciel détecte ces modèles après un premier encodage et les réencode en conservant l'ordre des sommets, ce qui garde chaque sommet unique. Les modèles étanches ne sont pas concernés.",
+  "param.keep_topology.help_size": "Aucun effet sur un modèle étanche. Un modèle non étanche pèse environ deux fois plus que sans ce réglage ; mesuré sur un cas réel : 29 % du STL d'origine au lieu de 12 %.",
+  "param.keep_topology.help_quality": "Les triangles sont les mêmes dans les deux cas. Ce qui change est ce qu'un slicer en déduit : mesuré dans OrcaSlicer sur un même modèle, 274 arêtes ouvertes avec ce réglage contre 3 330 sans, pour 268 dans le STL d'origine.",
+  "param.keep_topology.help_recommended": "Laissez coché si vous ouvrez vos .drc dans un slicer. Décochez pour une archive la plus compacte possible que vous reconvertirez en STL avant usage : la reconversion redonne les mêmes triangles.",
+  "param.keep_topology.help_orca": "Pas de réglage équivalent dans OrcaSlicer."
 }

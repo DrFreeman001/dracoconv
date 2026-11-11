@@ -50,7 +50,8 @@ def test_system_language(monkeypatch, windows, expected):
 def test_catalog_ids():
     assert list(CATALOG) == [
         "compression_level", "position_bits", "tolerance_mm", "texcoord_bits", "normal_bits",
-        "generic_bits", "skip_attributes", "point_cloud", "preserve_order", "metadata", "preserve_polygons",
+        "generic_bits", "skip_attributes", "point_cloud", "preserve_order", "keep_topology", "metadata",
+        "preserve_polygons",
     ]
 
 

@@ -33,7 +33,8 @@ class Engine(Protocol):
 def unsupported_params(engine: Engine, settings: EncodeSettings, max_extent: float) -> set[str]:
     """Paramètres demandés que ce moteur ne sait pas honorer."""
     final = resolved(settings, max_extent)
-    missing = final.non_default() - set(engine.supports)
+    # « keep_topology » est une décision prise avant le moteur (voir convert.encode_bytes).
+    missing = final.non_default() - set(engine.supports) - {"keep_topology"}
     if final.position_bits > engine.max_position_bits:
         missing.add("position_bits")
     return missing

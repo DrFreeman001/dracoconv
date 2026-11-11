@@ -96,7 +96,7 @@ def test_declared_support(engine):
 
 
 def test_unsupported_param_raises(engine, sphere):
-    unsupported = set(CATALOG) - engine.supports - {"tolerance_mm"}
+    unsupported = set(CATALOG) - engine.supports - {"tolerance_mm", "keep_topology"}
     assert unsupported == {"generic_bits", "metadata", "preserve_polygons"}
     for pid in unsupported:
         assert not engine.can_encode(non_default(pid), sphere.max_extent())

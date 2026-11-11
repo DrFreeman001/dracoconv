@@ -20,6 +20,7 @@ class EncodeSettings:
     skip_attributes: frozenset[str] = frozenset({"normal"})
     point_cloud: bool = False
     preserve_order: bool = False
+    keep_topology: bool = True
     metadata: bool = False
     preserve_polygons: bool = False
 
