@@ -1,8 +1,50 @@
 {
-  "_meta": {"calibrated": false, "note": "Valeurs de départ ; remplacées par un calibrage sur une collection réelle."},
-  "stl": {"lossless": 0.15, "q14": 0.02, "q16": 0.03, "q20": 0.045, "q25": 0.06},
-  "obj": {"lossless": 0.10, "q14": 0.015, "q16": 0.02, "q20": 0.03, "q25": 0.04},
-  "ply": {"lossless": 0.35, "q14": 0.05, "q16": 0.07, "q20": 0.11, "q25": 0.15},
-  "3mf": {"lossless": 0.60, "q14": 0.10, "q16": 0.13, "q20": 0.20, "q25": 0.27},
-  "zip": {"lossless": 0.45, "q14": 0.15, "q16": 0.17, "q20": 0.22, "q25": 0.27}
+  "_meta": {
+    "calibrated": true,
+    "date": "2026-11-11",
+    "files": 7621,
+    "bytes": 62999744822,
+    "kinds": [
+      "obj",
+      "ply",
+      "stl"
+    ],
+    "per_class": 5,
+    "note": "Ratios mesurés par échantillon sur une collection réelle de modèles d'impression 3D. Les types absents de « kinds » gardent des valeurs de départ non mesurées."
+  },
+  "stl": {
+    "lossless": 0.1209,
+    "q14": 0.0508,
+    "q16": 0.0563,
+    "q20": 0.0702,
+    "q25": 0.0886
+  },
+  "obj": {
+    "lossless": 0.0987,
+    "q14": 0.0109,
+    "q16": 0.0155,
+    "q20": 0.0276,
+    "q25": 0.0427
+  },
+  "ply": {
+    "lossless": 0.1647,
+    "q14": 0.0329,
+    "q16": 0.0407,
+    "q20": 0.0593,
+    "q25": 0.084
+  },
+  "3mf": {
+    "lossless": 0.6,
+    "q14": 0.1,
+    "q16": 0.13,
+    "q20": 0.2,
+    "q25": 0.27
+  },
+  "zip": {
+    "lossless": 0.45,
+    "q14": 0.15,
+    "q16": 0.17,
+    "q20": 0.22,
+    "q25": 0.27
+  }
 }

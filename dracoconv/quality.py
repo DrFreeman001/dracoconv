@@ -83,6 +83,27 @@ def _integrity(mesh: "Mesh") -> tuple[bool, float | None]:
     return watertight, float(tm.volume) if watertight else None
 
 
+def _surface_points(mesh: "Mesh") -> np.ndarray:
+    """Sommets qui portent réellement la surface.
+
+    Un sommet qui n'appartient qu'à des facettes dégénérées (deux sommets confondus) ne dessine
+    rien : Draco supprime ces facettes, et le sommet avec. Il ne doit pas compter dans l'écart.
+    """
+    if mesh.triangle_count() == 0:
+        return mesh.positions
+    faces = mesh.faces
+    tris = mesh.positions[faces]
+    degenerate = (
+        (tris[:, 0] == tris[:, 1]).all(axis=1) | (tris[:, 1] == tris[:, 2]).all(axis=1)
+        | (tris[:, 0] == tris[:, 2]).all(axis=1)
+    )
+    if not degenerate.any():
+        return mesh.positions
+    used = np.zeros(len(mesh.positions), dtype=bool)
+    used[faces[~degenerate].ravel()] = True
+    return mesh.positions[used] if used.any() else mesh.positions
+
+
 def measure(source: "Mesh", decoded: "Mesh", integrity: bool = True) -> QualityReport:
     """Compare un maillage à sa version décodée. ``integrity=False`` saute étanchéité et volume."""
     from scipy.spatial import cKDTree
@@ -97,7 +118,7 @@ def measure(source: "Mesh", decoded: "Mesh", integrity: bool = True) -> QualityR
     if identical or len(decoded.positions) == 0:
         max_error = rms_error = 0.0 if identical else math.inf
     else:
-        distances, _ = cKDTree(decoded.positions).query(source.positions)
+        distances, _ = cKDTree(decoded.positions).query(_surface_points(source))
         max_error = float(distances.max())
         rms_error = float(np.sqrt(np.mean(distances.astype(np.float64) ** 2)))
     before, after = len(canon_before), len(canon_after)

@@ -193,6 +193,42 @@ def test_verify_accepts_within_bound_only(sphere):
     assert verify(sphere, data, replace(EncodeSettings(), position_bits=20))[0] is False
 
 
+def _with_speck(sphere) -> Mesh:
+    """Une sphère plus un éclat : un triangle isolé de 0,1 µm, à 5 mm de la surface."""
+    speck = np.float32([[60, 0, 0], [60.0001, 0, 0], [60, 0.0001, 0]])
+    faces = np.vstack([sphere.faces, [[len(sphere.positions) + i for i in range(3)]]]).astype(np.uint32)
+    return Mesh(np.vstack([sphere.positions, speck]), faces)
+
+
+def test_specks_smaller_than_the_grid_do_not_fail_verification(sphere):
+    mesh = _with_speck(sphere)
+    quantized = replace(EncodeSettings(), position_bits=12)
+    data, report = encode_bytes(mesh, quantized)
+    assert report.degenerate_created == 1 and report.max_error_mm <= 0.03
+    assert encode_bytes(mesh, EncodeSettings())[1].identical  # sans quantification, l'éclat est conservé
+
+
+def test_a_vanished_visible_part_still_fails_verification(sphere):
+    """Seuls les triangles écrasés par la grille sont excusés : une partie visible qui manque reste une erreur."""
+    mesh = _with_speck(sphere)
+    quantized = replace(EncodeSettings(), position_bits=12)
+    without_sphere_half = Mesh(mesh.positions, mesh.faces[: len(mesh.faces) // 2])
+    data = DracoPyEngine().encode(without_sphere_half, quantized)
+    assert verify(mesh, data, quantized)[0] is False
+
+
+def test_vertices_used_only_by_degenerate_faces_do_not_fail_verification(sphere):
+    """Cas réel : un STL contient des facettes dégénérées (deux sommets confondus) loin de la surface.
+    Draco les supprime ; leurs sommets disparaissent avec elles sans que la forme change."""
+    n = len(sphere.positions)
+    stray = np.float32([[60, 0, 0], [61, 0, 0]])
+    mesh = Mesh(np.vstack([sphere.positions, stray]), np.vstack([sphere.faces, [[n, n, n + 1]]]).astype(np.uint32))
+    quantized = replace(EncodeSettings(), position_bits=12)
+    data, report = encode_bytes(mesh, quantized)
+    assert report.max_error_mm <= 0.03 and report.triangles_before == sphere.triangle_count()
+    assert encode_bytes(mesh, EncodeSettings())[1].identical
+
+
 def test_encode_bytes_returns_verified_data(sphere):
     data, report = encode_bytes(sphere, EncodeSettings())
     assert report.identical and same_geometry(DracoPyEngine().decode(data), sphere)
