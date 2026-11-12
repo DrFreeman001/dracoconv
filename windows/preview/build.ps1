@@ -1,0 +1,19 @@
+param()
+$ErrorActionPreference='Stop'
+$vc='C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.51.36231'
+$sdk='C:/Program Files (x86)/Windows Kits/10'
+$version='10.0.26100.0'
+$env:INCLUDE="$vc/include;$sdk/Include/$version/ucrt;$sdk/Include/$version/um;$sdk/Include/$version/shared"
+$env:LIB="$vc/lib/x64;$sdk/Lib/$version/ucrt/x64;$sdk/Lib/$version/um/x64"
+New-Item -ItemType Directory -Force "$PSScriptRoot/build" | Out-Null
+& "$vc/bin/Hostx64/x64/cl.exe" /nologo /utf-8 /EHsc /std:c++17 /W4 /DUNICODE /D_UNICODE "$PSScriptRoot/probe.cpp" /Fo"$PSScriptRoot/build/probe.obj" /Fe"$PSScriptRoot/build/probe.exe" /link ole32.lib shlwapi.lib gdi32.lib uuid.lib
+if($LASTEXITCODE){throw 'Probe compile failed'}
+if(Test-Path "$PSScriptRoot/bridge.cpp"){
+& "$vc/bin/Hostx64/x64/cl.exe" /nologo /utf-8 /EHsc /std:c++17 /W4 /DUNICODE /D_UNICODE /LD "$PSScriptRoot/bridge.cpp" /Fo"$PSScriptRoot/build/bridge.obj" /Fe"$PSScriptRoot/build/DracoPreview.dll" /link /DEF:"$PSScriptRoot/bridge.def" ole32.lib shell32.lib shlwapi.lib gdi32.lib user32.lib uuid.lib windowscodecs.lib advapi32.lib
+if($LASTEXITCODE){throw 'Bridge compile failed'}
+}
+
+foreach($name in @('preview_probe','cache_probe')) {
+ & "$vc/bin/Hostx64/x64/cl.exe" /nologo /utf-8 /EHsc /std:c++17 "$PSScriptRoot/$name.cpp" /Fo"$PSScriptRoot/build/$name.obj" /Fe"$PSScriptRoot/build/$name.exe" /link ole32.lib shell32.lib shlwapi.lib user32.lib uuid.lib
+ if($LASTEXITCODE){throw "$name compile failed"}
+}

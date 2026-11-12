@@ -1,30 +1,62 @@
 {
   "_meta": {
     "calibrated": true,
-    "date": "2026-11-11",
-    "files": 7621,
-    "bytes": 62999744822,
+    "date": "2026-11-12",
+    "files": 7224,
+    "bytes": 58890591267,
     "kinds": [
       "obj",
-      "ply",
       "stl"
     ],
     "per_class": 5,
-    "note": "Ratios mesurés par échantillon sur une collection réelle de modèles d'impression 3D. Les types absents de « kinds » gardent des valeurs de départ non mesurées."
+    "note": "STL et OBJ mesurés le 2026-11-12 sur le même échantillon de 40 fichiers par profil (38 encodés, 2 illisibles conservés à leur taille d'origine dans la projection). PLY conservé de la calibration du 2026-11-11 sur deux fichiers ; ZIP et 3MF restent des valeurs de départ non mesurées.",
+    "keep_topology": true,
+    "budget_seconds_per_profile": 3600,
+    "seed": 1,
+    "max_bytes": 314572800,
+    "sampled_files_by_profile": {
+      "lossless": 40,
+      "q14": 40,
+      "q16": 40,
+      "q20": 40,
+      "q25": 40
+    },
+    "encoded_files_by_profile": {
+      "lossless": 38,
+      "q14": 38,
+      "q16": 38,
+      "q20": 38,
+      "q25": 38
+    },
+    "unreadable_files_by_profile": {
+      "lossless": 2,
+      "q14": 2,
+      "q16": 2,
+      "q20": 2,
+      "q25": 2
+    },
+    "source": "NAS, originaux",
+    "retained_calibration": {
+      "ply": {
+        "date": "2026-11-11",
+        "files": 2,
+        "keep_topology": true
+      }
+    }
   },
   "stl": {
-    "lossless": 0.1209,
-    "q14": 0.0508,
-    "q16": 0.0563,
-    "q20": 0.0702,
-    "q25": 0.0886
+    "lossless": 0.2215,
+    "q14": 0.1464,
+    "q16": 0.1516,
+    "q20": 0.1721,
+    "q25": 0.1884
   },
   "obj": {
-    "lossless": 0.0987,
-    "q14": 0.0109,
-    "q16": 0.0155,
-    "q20": 0.0276,
-    "q25": 0.0427
+    "lossless": 0.1685,
+    "q14": 0.096,
+    "q16": 0.0993,
+    "q20": 0.1086,
+    "q25": 0.1211
   },
   "ply": {
     "lossless": 0.1647,

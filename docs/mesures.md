@@ -6,7 +6,7 @@ Relevées le 2026-11-11 sur une collection de modèles d'impression 3D (Windows 
 
 Dossier de 36 fichiers, dont 15 STL et 14 fichiers 3MF (parmi lesquels 8 `.gcode.3mf`). Sans quantification, niveau 10, **« Préserver la topologie » décoché** : cet essai a été fait avant l'ajout de ce réglage, aujourd'hui coché par défaut. Conversion vers un dossier miroir, puis retour en STL.
 
-Avec « Préserver la topologie » coché (le défaut actuel), les mêmes 15 STL donnent **184,2 Mo, soit 29,7 % de la taille d'origine**, au lieu de 76,4 Mo : la plupart de ces modèles ne sont pas étanches et sont donc réencodés sans dédoublement de sommets. C'est le prix d'un `.drc` qu'OrcaSlicer lit comme le STL d'origine (voir section 2).
+Avec « Préserver la topologie » coché (le défaut actuel), les mêmes 15 STL donnent **184,2 Mo, soit 29,7 % de la taille d'origine**, au lieu de 76,4 Mo : la plupart de ces modèles ne sont pas étanches et sont donc réencodés sans dédoublement de sommets. Ce réglage réduit les différences de connectivité à la lecture dans OrcaSlicer, sans garantir des statistiques identiques (voir section 2).
 
 | Étape | Résultat |
 |---|---|
@@ -52,26 +52,44 @@ La commande `dracoconv quality <fichier>` affiche le nombre de sommets dédoubl�
 
 Le sens inverse (un `.drc` exporté par OrcaSlicer puis relu par dracoconv) n'a pas été testé : l'export DRC d'OrcaSlicer passe par sa fenêtre.
 
-## 3. Ratios calibrés sur la collection
+### Vérification complémentaire : deux modèles fournis
 
-Échantillon tiré au hasard parmi 7 621 fichiers STL, OBJ et PLY de 300 Mo au plus (63,0 Go), 5 fichiers par type et par classe de taille, soit 42 fichiers réellement encodés pour chaque réglage. Taille obtenue en proportion de la taille d'origine :
+Réglages par défaut actuels : niveau 10, sans quantification, topologie préservée. Mesures en octets décimaux (Mo = 1 000 000 octets).
 
-| Réglage | STL | OBJ | PLY |
-|---|---|---|---|
-| Sans quantification | 12,1 % | 9,9 % | 16,5 % |
-| 14 bits | 5,1 % | 1,1 % | 3,3 % |
-| 16 bits | 5,6 % | 1,6 % | 4,1 % |
-| 20 bits | 7,0 % | 2,8 % | 5,9 % |
-| 25 bits | 8,9 % | 4,3 % | 8,4 % |
+| Modèle | STL | Draco | Gain | Encodage / retour vérifiés |
+|---|---:|---:|---:|---:|
+| thailand_buddha | 145,49 Mo | 43,55 Mo | 70,07 % | 18,89 s / 11,26 s |
+| Genius_of_Evil_28cm | 16,74 Mo | 4,92 Mo | 70,62 % | 1,70 s / 0,74 s |
 
-Ces valeurs sont livrées dans `dracoconv/data/ratios.json` et servent à la projection instantanée. À lire avec prudence :
+Contrôle indépendant des facettes binaires par tri canonique puis SHA-256 : tous les triangles orientés, leurs coordonnées et les bornes sont identiques après retour STL (2 909 880 et 334 858 triangles). Les originaux ont gardé leur empreinte SHA-256. L'en-tête et les normales STL sont reconstruits.
 
-- Ce sont des estimations sur 42 fichiers, pas un recensement. Le PLY ne repose que sur 2 fichiers.
-- Avec quantification, un STL de l'échantillon (139 Mo) n'avait pas pu être encodé lors du calibrage, à cause d'un défaut de vérification corrigé depuis ; il a été compté à sa taille d'origine. Les ratios STL avec quantification sont donc un peu pessimistes : ce fichier seul descend à 1,3 % à 14 bits.
-- Les ratios 3MF et ZIP du fichier ne sont pas mesurés : ce sont des valeurs de départ.
-- Les fichiers de plus de 300 Mo ont été écartés du calibrage pour en borner la durée.
+OrcaSlicer ouvre les six fichiers. Les STL reconstruits retrouvent exactement les statistiques des originaux. La lecture directe des Draco reste différente : volume du Bouddha +0,0044 % environ ; Génie 274 arêtes ouvertes et 55 parties contre 268 et 54 pour le STL, volume +0,12 % environ. **Préserver la topologie ne garantit pas une interprétation identique par le lecteur Draco d'OrcaSlicer.** La cause précise et le G-code n'ont pas été vérifiés.
 
-Appliqué aux 73,6 Go de STL recensés sur C, D, E et F, le ratio sans quantification donne un ordre de grandeur de 9 Go après conversion. La projection par échantillon du logiciel donnera un chiffre et une marge propres à chaque dossier.
+Le mode remplacer a été testé sur une copie réelle du Génie : un succès, copie STL retrouvée dans la corbeille Windows, Draco conservé identique à celui validé, original de la collection inchangé. La corbeille n'a pas été vidée. Rapports locaux sous `.superpowers/validation-2026-11-11/` (non suivis par Git).
+
+## 3. Ratios recalibrés avec préservation de topologie
+
+Recalibrage du 2026-11-12 sur les originaux conservés sur NAS : **7224 fichiers, 58,89 Go**, fichiers de 300 Mio au plus. Niveau 10, `keep_topology` activé, graine 1, cinq fichiers par classe de taille, budget maximal de 3600 secondes par profil. Les cinq profils ont traité le **même échantillon complet de 40 fichiers** : 38 encodés et deux OBJ illisibles. Le compteur du journal dit « encodés », mais compte les tentatives ; les deux fichiers illisibles restent à leur taille d'origine dans la projection.
+
+| Réglage | STL | OBJ | Fichiers tentés / encodés | Durée |
+|---|---:|---:|---:|---:|
+| Sans quantification | 22,15 % | 16,85 % | 40 / 38 | 289 s |
+| 14 bits | 14,64 % | 9,60 % | 40 / 38 | 395 s |
+| 16 bits | 15,16 % | 9,93 % | 40 / 38 | 463 s |
+| 20 bits | 17,21 % | 10,86 % | 40 / 38 | 454 s |
+| 25 bits | 18,84 % | 12,11 % | 40 / 38 | 461 s |
+
+Ces proportions sont des estimations de taille restante, pas des gains garantis. Les intervalles d'incertitude sont larges : sans quantification, 7,33–30,43 % pour les STL et 5,52–41,77 % pour les OBJ. Utiliser la projection sur les fichiers concernés. Les ratios augmentent bien avec la précision sur cet échantillon commun, sans correction artificielle des résultats.
+
+Aucun PLY n'est présent dans cet inventaire NAS. Les ratios PLY conservés proviennent des **deux fichiers mesurés le 2026-11-11** : 16,47 % sans quantification, puis 3,29 / 4,07 / 5,93 / 8,40 % à 14 / 16 / 20 / 25 bits. Les ratios ZIP et 3MF restent des valeurs de départ non mesurées. Cette provenance est enregistrée dans `_meta`, avec les réglages et les effectifs tentés, encodés et illisibles.
+
+Commande utilisée, en lecture seule sur les originaux :
+
+```powershell
+.venv/Scripts/python tools/calibrate.py '<collection>' --budget 3600 --out dracoconv/data/ratios.json
+```
+
+Journal local : `.superpowers/validation-2026-11-11/calibration-nas.log`. La première calibration locale portait sur 7623 fichiers (dont deux STL reconstruits lors des contrôles) et utilisait des échantillons partiels différents. Sa reprise a été abandonnée lorsque seuls 341 fichiers admissibles restaient. L'utilisateur a confirmé avoir converti les originaux locaux ; les mesures NAS ci-dessus remplacent désormais les anciens ratios STL/OBJ partiels.
 
 ## 4. Limites mesurées des moteurs
 

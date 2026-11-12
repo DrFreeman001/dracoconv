@@ -19,6 +19,7 @@ from ...i18n import format_size, tr
 from ...settings import EncodeSettings
 from ..state import AppState
 from ..workers import Worker
+from ..activity import ActivityBar
 
 _MODES = ("keep", "mirror", "replace")
 _FORMATS = ("stl", "obj", "ply")
@@ -97,7 +98,9 @@ class ConvertPage(QWidget):
         run_row.addWidget(self.stop_button)
         run_row.addWidget(self.progress, 1)
 
+        self.activity = ActivityBar()
         layout = QVBoxLayout(self)
+        layout.addWidget(self.activity)
         layout.addWidget(self.originals_group_box)
         layout.addLayout(options_row)
         layout.addWidget(self.plan_group, 1)
@@ -235,9 +238,11 @@ class ConvertPage(QWidget):
     def _launch(self, journal: Journal, settings: EncodeSettings, options: BatchOptions) -> None:
         self.state.journal = journal
         total = len(journal.pending())
+        self.activity.start()
         self._done = 0
         self.progress.setRange(0, max(1, total))
         self.progress.setValue(0)
+        self.progress.setFormat("%v / %m — %p%")
         self._set_status("gui.convert.running", done=0, total=total)
         self._worker = Worker(run, journal, settings, options, progress_arg="on_progress", stop_arg="stop", parent=self)
         self._worker.progress.connect(lambda _result, total=total: self._on_progress(total))
@@ -257,6 +262,7 @@ class ConvertPage(QWidget):
         self._set_status("gui.convert.running", done=self._done, total=total)
 
     def _on_finished(self, summary: dict) -> None:
+        self.activity.stop()
         self._worker = None
         if summary.get("paused"):
             self._set_status("gui.convert.paused", reason_code=summary["paused"])
@@ -268,6 +274,7 @@ class ConvertPage(QWidget):
         self.finished.emit(summary)
 
     def _on_failed(self, message: str) -> None:
+        self.activity.stop()
         self._worker = None
         self.status_label.setText(message)
         self._update_buttons()

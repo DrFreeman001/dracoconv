@@ -346,5 +346,10 @@
   "param.keep_topology.help_size": "Aucun effet sur un modèle étanche. Un modèle non étanche pèse environ deux fois plus que sans ce réglage ; mesuré sur un cas réel : 29 % du STL d'origine au lieu de 12 %.",
   "param.keep_topology.help_quality": "Les triangles sont les mêmes dans les deux cas. Ce qui change est ce qu'un slicer en déduit : mesuré dans OrcaSlicer sur un même modèle, 274 arêtes ouvertes avec ce réglage contre 3 330 sans, pour 268 dans le STL d'origine.",
   "param.keep_topology.help_recommended": "Laissez coché si vous ouvrez vos .drc dans un slicer. Décochez pour une archive la plus compacte possible que vous reconvertirez en STL avant usage : la reconversion redonne les mêmes triangles.",
-  "param.keep_topology.help_orca": "Pas de réglage équivalent dans OrcaSlicer."
+  "param.keep_topology.help_orca": "Pas de réglage équivalent dans OrcaSlicer.",
+  "gui.menu.theme": "Apparence",
+  "gui.theme.system": "Système",
+  "gui.theme.light": "Clair",
+  "gui.theme.dark": "Sombre",
+  "gui.activity": "Traitement en cours — progression interne non disponible"
 }

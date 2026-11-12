@@ -4,10 +4,11 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
-    QHBoxLayout, QListWidget, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QHBoxLayout, QListWidget, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from ..config import save_prefs
+from ..config import load_prefs, save_prefs
+from .theme import THEMES, apply_theme
 from ..i18n import get_language, set_language, tr
 from .pages.convert import ConvertPage
 from .pages.journal import JournalPage
@@ -66,6 +67,19 @@ class MainWindow(QMainWindow):
             self.language_menu.addAction(action)
             self.language_actions[code] = action
 
+        self.theme_menu = self.menuBar().addMenu("")
+        theme_group = QActionGroup(self)
+        self.theme_actions = {}
+        for name in THEMES:
+            action = QAction("", self, checkable=True)
+            action.triggered.connect(lambda _checked=False, name=name: self.set_theme(name))
+            theme_group.addAction(action)
+            self.theme_menu.addAction(action)
+            self.theme_actions[name] = action
+        self._theme = "system"
+        QApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
+        self.set_theme(load_prefs().get("theme", "system"), persist=False)
+
         self.steps.currentRowChanged.connect(self._show_step)
         self.previous_button.clicked.connect(lambda: self.steps.setCurrentRow(max(0, self.steps.currentRow() - 1)))
         self.next_button.clicked.connect(
@@ -107,6 +121,27 @@ class MainWindow(QMainWindow):
         self.projection_page.refresh_instant()
         self.convert_page.direction_changed()
 
+    def set_theme(self, name: str, persist: bool = True) -> None:
+        name = name if name in THEMES else "system"
+        self._theme = name
+        QApplication.instance().setProperty("dracoconvTheme", name)
+        apply_theme(name)
+        self.theme_actions[name].setChecked(True)
+        if persist:
+            save_prefs({"theme": name})
+        self._refresh_theme_details()
+
+    def _system_theme_changed(self, scheme) -> None:
+        if QApplication.instance().property("dracoconvTheme") == "system":
+            apply_theme("system", system_scheme=scheme)
+            self._refresh_theme_details()
+
+    def _refresh_theme_details(self) -> None:
+        dark = QApplication.palette().color(self.backgroundRole()).lightness() < 128
+        warning = "#efb45e" if dark else "#b45309"
+        self.convert_page.warning_label.setStyleSheet(f"color: {warning}; font-weight: 600;")
+        self.projection_page._draw_chart()
+
     def set_language(self, lang: str) -> None:
         set_language(lang)
         save_prefs({"language": lang})
@@ -115,6 +150,9 @@ class MainWindow(QMainWindow):
 
     def retranslate(self) -> None:
         self.setWindowTitle(tr("gui.title"))
+        self.theme_menu.setTitle(tr("gui.menu.theme"))
+        for name, action in self.theme_actions.items():
+            action.setText(tr("gui.theme." + name))
         self.language_menu.setTitle(tr("gui.menu.language"))
         for row, step in enumerate(_STEPS):
             self.steps.item(row).setText(tr(f"gui.step.{step}"))

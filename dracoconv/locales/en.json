@@ -346,5 +346,10 @@
   "param.keep_topology.help_size": "No effect on a watertight model. A non-watertight model is roughly twice as large as without this setting; measured on a real case: 29% of the original STL instead of 12%.",
   "param.keep_topology.help_quality": "The triangles are the same either way. What changes is what a slicer infers from them: measured in OrcaSlicer on one model, 274 open edges with this setting against 3,330 without, for 268 in the original STL.",
   "param.keep_topology.help_recommended": "Leave ticked if you open your .drc files in a slicer. Untick for the most compact archive, to be converted back to STL before use: converting back yields the same triangles.",
-  "param.keep_topology.help_orca": "No equivalent setting in OrcaSlicer."
+  "param.keep_topology.help_orca": "No equivalent setting in OrcaSlicer.",
+  "gui.menu.theme": "Appearance",
+  "gui.theme.system": "System",
+  "gui.theme.light": "Light",
+  "gui.theme.dark": "Dark",
+  "gui.activity": "Processing — internal progress unavailable"
 }

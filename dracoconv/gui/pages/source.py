@@ -14,6 +14,7 @@ from ...io.sniff import FileKind
 from ...scan import DEFAULT_EXCLUDES, Inventory, ScanOptions, scan
 from ..state import AppState
 from ..workers import Worker
+from ..activity import ActivityBar
 
 _KINDS = (FileKind.STL, FileKind.OBJ, FileKind.PLY, FileKind.THREEMF, FileKind.ZIP, FileKind.DRC)
 _ENCODE_KINDS = {FileKind.STL, FileKind.OBJ, FileKind.PLY, FileKind.THREEMF, FileKind.ZIP}
@@ -88,7 +89,9 @@ class SourcePage(QWidget):
         result_layout.addWidget(self.table)
         result_layout.addWidget(self.ignored_label)
 
+        self.activity = ActivityBar()
         layout = QVBoxLayout(self)
+        layout.addWidget(self.activity)
         layout.addWidget(self.intro_label)
         layout.addLayout(direction_row)
         layout.addWidget(self.roots_group, 1)
@@ -156,6 +159,7 @@ class SourcePage(QWidget):
     def start_scan(self) -> None:
         if self._worker is not None or not self.state.roots:
             return
+        self.activity.start()
         self.scan_button.setEnabled(False)
         self._set_status("gui.source.scanning", n=0)
         self._worker = Worker(scan, list(self.state.roots), self.scan_options(),
@@ -167,11 +171,13 @@ class SourcePage(QWidget):
 
     def _scan_failed(self, message: str) -> None:
         self._worker = None
+        self.activity.stop()
         self.scan_button.setEnabled(True)
         self.status_label.setText(message)
 
     def _scan_done(self, inventory: Inventory) -> None:
         self._worker = None
+        self.activity.stop()
         self.scan_button.setEnabled(True)
         self.state.inventory = inventory
         self.state.projection = None

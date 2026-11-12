@@ -16,7 +16,7 @@ dependencies = [
     "networkx",
     "lxml",
     "DracoPy>=2.0",
-    "PySide6",
+    "PySide6>=6.8",
     "send2trash",
 ]
 

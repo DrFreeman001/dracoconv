@@ -7,7 +7,7 @@ from PySide6.QtCharts import QChart, QChartView, QLineSeries, QLogValueAxis, QVa
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
-    QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QSpinBox, QTableWidget,
+    QApplication, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QSpinBox, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -18,6 +18,7 @@ from ...sampling import QualitySample, quality_sample
 from ...settings import EncodeSettings
 from ..state import AppState
 from ..workers import Worker
+from ..activity import ActivityBar
 
 _TYPICAL_EXTENT_MM = 100.0
 _KIND_ORDER = ("stl", "obj", "ply", "3mf", "zip")
@@ -103,7 +104,9 @@ class ProjectionPage(QWidget):
         quality_layout.addWidget(self.marks_label)
         quality_layout.addWidget(self.chart, 1)
 
+        self.activity = ActivityBar()
         layout = QVBoxLayout(self)
+        layout.addWidget(self.activity)
         layout.addWidget(self.gain_group)
         layout.addWidget(self.quality_group, 1)
         self.sample_button.clicked.connect(self.start_sampling)
@@ -128,6 +131,7 @@ class ProjectionPage(QWidget):
         inventory = self.state.inventory
         if self._worker is not None or inventory is None or self.state.direction != "encode":
             return
+        self.activity.start()
         self.sample_button.setEnabled(False)
         self._progress = (0, 0)
         self._worker = Worker(_sample_task, inventory, self._get_settings(), self._get_engine(),
@@ -157,6 +161,7 @@ class ProjectionPage(QWidget):
 
     def _on_quality(self, quality: QualitySample) -> None:
         self._worker = None
+        self.activity.stop()
         self.sample_button.setEnabled(True)
         self._quality = quality
         if quality.files:
@@ -167,6 +172,7 @@ class ProjectionPage(QWidget):
     def _on_failed(self, message: str) -> None:
         self._worker = None
         self._progress = None
+        self.activity.stop()
         self.sample_button.setEnabled(True)
         self.progress_label.setText(message)
 
@@ -255,6 +261,9 @@ class ProjectionPage(QWidget):
 
     def _draw_chart(self) -> None:
         chart = QChart()
+        dark = QApplication.palette().color(self.backgroundRole()).lightness() < 128
+        if dark:
+            chart.setTheme(QChart.ChartTheme.ChartThemeDark)
         chart.setTitle(tr("gui.chart.title"))
         bits_axis = QValueAxis()
         bits_axis.setRange(8, MAX_BITS)
@@ -285,7 +294,8 @@ class ProjectionPage(QWidget):
             mark.setName(f"{tr('gui.chart.mark.' + name)} ({format_number(value, 2)} mm)")
             mark.append(8, value)
             mark.append(MAX_BITS, value)
-            pen = QPen(QColor(_MARK_COLORS[name]))
+            color = {"layer_height": "#b69aff", "nozzle": "#efb45e", "cad_tolerance": "#b4becd"}[name] if dark else _MARK_COLORS[name]
+            pen = QPen(QColor(color))
             pen.setWidthF(1.5)
             pen.setStyle(Qt.PenStyle.DashLine)
             mark.setPen(pen)

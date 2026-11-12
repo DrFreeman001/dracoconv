@@ -17,7 +17,7 @@ Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'o
 - **Un original n'est jamais touché par défaut.** Le mode « remplacer » doit être confirmé et envoie l'original à la corbeille seulement après vérification et relecture du fichier écrit. Il ne s'applique jamais aux 3MF, aux ZIP, ni à un fichier dont la conversion écarte des données (textures, couleurs, normales ou matériaux d'un OBJ, par exemple). Sur un volume sans corbeille (réseau, clé USB), l'original est conservé.
 - **La corbeille a une taille limite.** Quand elle déborde, Windows en purge les éléments les plus anciens sans prévenir. Avant de remplacer des dizaines de gigaoctets, vérifiez sa taille maximale dans ses propriétés, ou préférez le mode miroir.
 - **3MF : la conversion perd des données** (plateaux, réglages d'impression, couleurs, séparation des objets) et fait rarement gagner de la place, un 3MF étant déjà compressé. Les projets Bambu Studio et OrcaSlicer ne sont pas lus et sont laissés tels quels. Les fichiers `.gcode.3mf` sont ignorés.
-- **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, l'encodage le plus compact de Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors bien plus d'arêtes ouvertes que dans le STL d'origine. Le réglage **« Préserver la topologie »**, coché par défaut, détecte ces modèles et les encode autrement : OrcaSlicer les lit alors comme le STL, mais ils pèsent environ deux fois plus. Sur une collection de figurines, où presque rien n'est étanche, cela change beaucoup le gain : 30 % de la taille d'origine au lieu de 12 % sur le dossier d'essai. Décochez-le (`--no-keep-topology`) pour une archive la plus compacte possible, à reconvertir en STL avant usage. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
+- **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, l'encodage le plus compact de Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors bien plus d'arêtes ouvertes que dans le STL d'origine. Le réglage **« Préserver la topologie »**, coché par défaut, détecte ces modèles et les encode autrement : cela réduit fortement les écarts de connectivité dans OrcaSlicer, au prix de fichiers plus gros. La lecture directe du Draco peut encore différer légèrement de celle du STL ; le retour en STL a retrouvé exactement les statistiques originales sur les deux modèles vérifiés. Sur une collection de figurines, où presque rien n'est étanche, cela change beaucoup le gain : 30 % de la taille d'origine au lieu de 12 % sur le dossier d'essai. Décochez-le (`--no-keep-topology`) pour une archive la plus compacte possible, à reconvertir en STL avant usage. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
 - **Au-delà de 22 bits environ, quantifier ne gagne plus en précision** pour un modèle de taille courante : la limite devient celle des nombres du fichier d'origine.
 
 ## Installation
@@ -64,7 +64,9 @@ Cinq étapes :
 4. **Conversion** — sort des originaux (garder, miroir, remplacer), plan détaillé, lancement, arrêt.
 5. **Journal** — résultat fichier par fichier, export CSV, relance des échecs.
 
-La langue se change dans le menu, sans redémarrer.
+La langue se change dans le menu, sans redémarrer. Le menu **Apparence** permet de choisir **Système**, **Clair** ou **Sombre** ; le choix est mémorisé.
+
+Une barre animée indique le travail pendant l’analyse, l’estimation et la conversion. Le compteur de conversion affiche les fichiers terminés et le pourcentage du lot ; il ne prétend pas mesurer la progression interne de l’encodeur sur un fichier.
 
 ## La ligne de commande
 

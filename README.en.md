@@ -17,7 +17,7 @@ Built to archive a collection of 3D-printing models: the `.drc` files open in Or
 - **An original is never touched by default.** "Replace" mode must be confirmed and sends the original to the recycle bin only after verification and a read-back of the written file. It never applies to 3MF or ZIP files, nor to a file whose conversion leaves data out (textures, colours, normals or materials of an OBJ, for example). On a volume without a recycle bin (network, USB stick), the original is kept.
 - **The recycle bin has a size limit.** When it overflows, Windows purges its oldest items without warning. Before replacing tens of gigabytes, check its maximum size in its properties, or prefer mirror mode.
 - **3MF: conversion loses data** (plates, print settings, colours, object separation) and rarely saves space, since a 3MF is already compressed. Bambu Studio and OrcaSlicer project files are not read and are left as they are. `.gcode.3mf` files are ignored.
-- **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco's most compact encoding duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts many more open edges than in the original STL. The **"Keep topology"** setting, on by default, detects those models and encodes them differently: OrcaSlicer then reads them like the STL, but they are roughly twice as large. On a collection of figurines, where almost nothing is watertight, this changes the savings a lot: 30% of the original size instead of 12% on the test folder. Turn it off (`--no-keep-topology`) for the most compact archive, to be converted back to STL before use. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
+- **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco's most compact encoding duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts many more open edges than in the original STL. The **"Keep topology"** setting, on by default, detects those models and encodes them differently: this greatly reduces connectivity differences in OrcaSlicer, at the cost of larger files. Reading Draco directly may still differ slightly from reading STL; converting back to STL restored the original statistics exactly on the two models checked. On a collection of figurines, where almost nothing is watertight, this changes the savings a lot: 30% of the original size instead of 12% on the test folder. Turn it off (`--no-keep-topology`) for the most compact archive, to be converted back to STL before use. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
 - **Beyond about 22 bits, quantizing gains no more precision** for a model of ordinary size: the limit becomes that of the numbers in the original file.
 
 ## Installation
@@ -64,7 +64,9 @@ Five steps:
 4. **Convert** — what happens to originals (keep, mirror, replace), detailed plan, start, stop.
 5. **Log** — result file by file, CSV export, retry of failed files.
 
-The language is changed from the menu, without restarting.
+The language is changed from the menu, without restarting. The **Appearance** menu offers **System**, **Light**, and **Dark**, and remembers the choice.
+
+An animated bar shows activity during scanning, estimation, and conversion. The conversion counter displays completed files and the batch percentage; it does not claim to measure the encoder’s internal progress within one file.
 
 ## The command line
 
