@@ -43,7 +43,7 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
    stopHelper();SetWindowTextW(window,L"Apercu indisponible : chargement interrompu ou limite atteinte.");
   }
  }
- void cleanup(){stopHelper();if(job){CloseHandle(job);job=nullptr;}if(process){WaitForSingleObject(process,1500);CloseHandle(process);process=nullptr;}if(window){DestroyWindow(window);window=nullptr;}if(!input.empty()){DeleteFileW(input.c_str());DeleteFileW((dir+L"\\thumb.png").c_str());DeleteFileW((dir+L"\\ready").c_str());DeleteFileW((dir+L"\\events.log").c_str());RemoveDirectoryW(dir.c_str());input.clear();}}
+ void cleanup(){stopHelper();if(job){CloseHandle(job);job=nullptr;}if(process){WaitForSingleObject(process,1500);CloseHandle(process);process=nullptr;}if(window){DestroyWindow(window);window=nullptr;}if(!input.empty()){DeleteFileW(input.c_str());DeleteFileW((dir+L"\\model.mesh").c_str());DeleteFileW((dir+L"\\model.mesh.part").c_str());DeleteFileW((dir+L"\\thumb.png").c_str());DeleteFileW((dir+L"\\ready").c_str());DeleteFileW((dir+L"\\events.log").c_str());RemoveDirectoryW(dir.c_str());input.clear();}}
  HRESULT launch(const std::wstring& args){
  wchar_t config[MAX_PATH];GetModuleFileNameW(module,config,MAX_PATH);PathRemoveFileSpecW(config);PathAppendW(config,L"preview.ini");
  wchar_t python[32768],script[32768];GetPrivateProfileStringW(L"helper",L"python",L"",python,32768,config);GetPrivateProfileStringW(L"helper",L"script",L"",script,32768,config);
@@ -105,8 +105,9 @@ public:
  if(!parent||input.empty())return E_UNEXPECTED;if(window)return S_FALSE;
  WNDCLASSW cls{};cls.lpfnWndProc=procedure;cls.hInstance=module;cls.lpszClassName=L"DracoConvPreviewContainer";cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);
  if(!RegisterClassW(&cls)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return error();
- window=CreateWindowExW(0,cls.lpszClassName,L"Chargement Draco...",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|WS_TABSTOP,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,parent,nullptr,module,this);
+ window=CreateWindowExW(0,cls.lpszClassName,L"Chargement...",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|WS_TABSTOP,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,parent,nullptr,module,this);
  if(!window)return error();HRESULT hr=launch(L"--parent "+std::to_wstring((uintptr_t)window));
+ if(hr==HRESULT_FROM_WIN32(ERROR_BUSY)){SetWindowTextW(window,L"Un autre apercu 3D est deja ouvert dans une autre fenetre.");return S_OK;}
  if(FAILED(hr)){stopHelper();SetWindowTextW(window,L"Apercu indisponible : impossible de lancer le processus.");}
  else{started=GetTickCount64();ready=false;SetTimer(window,1,200,nullptr);}return hr;
  }

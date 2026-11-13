@@ -48,23 +48,34 @@ def uninstall_values(state):
     state.unlink()
 
 
+# Clé d'inscription par extension. Pour STEP, SystemFileAssociations : la clé .step de l'utilisateur appartient
+# au trancheur associé, qui la réécrit et y efface les sous-clés shellex (constaté le 13 novembre 2026).
+EXTENSIONS={'.drc':'.drc','.step':'SystemFileAssociations\\.step','.stp':'SystemFileAssociations\\.stp'}
+
+
+def file_classes(ext):
+    """L'extension, ses associations système et les ProgID qui l'ouvrent : un gestionnaire étranger bloque l'installation."""
+    classes={ext,'SystemFileAssociations\\'+ext}
+    for registration in [current(ext,'',winreg.HKEY_CLASSES_ROOT), current('Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\'+ext+'\\UserChoice','ProgId')]:
+        if registration and registration[0]: classes.add(registration[0])
+    return classes
+
+
 def values():
     dll=str(HERE/'build/DracoPreview.dll')
     rows=[]
-    classes={'.drc'}
-    for registration in [current('.drc','',winreg.HKEY_CLASSES_ROOT), current(r'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.drc\UserChoice','ProgId')]:
-        if registration and registration[0]: classes.add(registration[0])
     for clsid,label in [(THUMB,'DracoConv prototype thumbnail'),(PREVIEW,'DracoConv prototype preview')]:
         base='Software\\Classes\\CLSID\\'+clsid
         rows += [(base,'',label),(base+'\\InprocServer32','',dll),(base+'\\InprocServer32','ThreadingModel','Apartment')]
     rows += [('Software\\Classes\\CLSID\\'+PREVIEW,'AppID','{6D2B5079-2F0B-48DD-AB7F-97CEC514D30B}'),('Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers',PREVIEW,'DracoConv prototype preview')]
-    for handler,clsid in [('{E357FCCD-A995-4576-B01F-234630154E96}',THUMB),('{8895B1C6-B41F-4C1C-A562-0D564250836F}',PREVIEW)]:
-        rel='.drc\\shellex\\'+handler
-        for file_class in classes:
-            existing=current(file_class+'\\shellex\\'+handler,'',winreg.HKEY_CLASSES_ROOT)
-            if existing is not None and existing[0].lower()!=clsid.lower():
-                raise RuntimeError('Existing .drc handler through '+file_class+': '+str(existing))
-        rows.append(('Software\\Classes\\'+rel,'',clsid))
+    for ext,location in EXTENSIONS.items():
+        classes=file_classes(ext)
+        for handler,clsid in [('{E357FCCD-A995-4576-B01F-234630154E96}',THUMB),('{8895B1C6-B41F-4C1C-A562-0D564250836F}',PREVIEW)]:
+            for file_class in classes:
+                existing=current(file_class+'\\shellex\\'+handler,'',winreg.HKEY_CLASSES_ROOT)
+                if existing is not None and existing[0].lower()!=clsid.lower():
+                    raise RuntimeError('Existing '+ext+' handler through '+file_class+': '+str(existing))
+            rows.append(('Software\\Classes\\'+location+'\\shellex\\'+handler,'',clsid))
     return rows
 
 

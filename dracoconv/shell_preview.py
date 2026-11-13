@@ -1,4 +1,4 @@
-"""Isolated Shell preview helper: full OpenGL rendering, sampled drawing as a fallback."""
+"""Isolated Shell preview helper for Draco and STEP: full OpenGL rendering, sampled drawing as a fallback."""
 from __future__ import annotations
 import argparse
 import ctypes
@@ -7,11 +7,11 @@ from pathlib import Path
 import sys
 import threading
 import numpy as np
-import DracoPy
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget
 from dracoconv import preview_rendering as gpu_rendering
+from dracoconv import step_preview
 
 MAX_INPUT = gpu_rendering.MAX_INPUT
 # Les modèles d'impression 3D ont Z vertical, comme dans les trancheurs.
@@ -21,27 +21,29 @@ SIMPLIFIED = 'Affichage simplifié · '
 DEFAULT_VIEW = (30., 20., 1.)
 
 
-def prepare_mesh(data: bytes, face_limit: int = 12000, up: str = UP_AXIS):
-    """Échantillon de faces pour le dessin de secours, quand OpenGL manque."""
-    if not data or len(data) > MAX_INPUT:
+def load_model(path: Path):
+    """Maillage complet du fichier, Draco ou STEP, reconnu par son contenu et non par son nom."""
+    path = Path(path)
+    if not 0 < path.stat().st_size <= MAX_INPUT:
         raise ValueError('Input exceeds preview limit or is empty')
-    try:
-        mesh = DracoPy.decode(data)
-    except Exception as exc:
-        raise ValueError('Invalid Draco input') from exc
-    faces = getattr(mesh, 'faces', None)
-    if faces is None or not len(faces):
-        raise ValueError('Draco point clouds are not supported by this preview')
-    points = np.asarray(mesh.points, dtype=np.float64)
-    if not np.isfinite(points).all():
-        raise ValueError('Non-finite geometry')
-    low, high = points.min(axis=0), points.max(axis=0)
-    scale = float(np.max(high - low))
-    if scale <= 0:
-        raise ValueError('Empty geometry bounds')
+    with path.open('rb') as source:
+        head = source.read(64)
+    if step_preview.is_step(head):
+        return step_preview.mesh_step(path, path.with_name('model.mesh'))
+    return gpu_rendering.decode_mesh(path.read_bytes())
+
+
+def prepare_mesh(data: bytes, face_limit: int = 12000, up: str = UP_AXIS):
+    """Échantillon de faces d'un contenu Draco, pour le dessin de secours."""
+    return sample_triangles(gpu_rendering.decode_mesh(data), face_limit, up)
+
+
+def sample_triangles(mesh, face_limit: int = 12000, up: str = UP_AXIS):
+    """Échantillon de faces pour le dessin de secours, quand OpenGL manque."""
+    faces = mesh.faces
     reduced = len(faces) > face_limit
     faces = faces[::max(1, math.ceil(len(faces) / face_limit))]
-    triangles = (points[faces] - (low + high) / 2) / scale
+    triangles = mesh.positions[faces].astype(np.float64)
     if up == 'z':
         # Rotation de -90° autour de X : Z devient la verticale de l'écran.
         triangles = np.stack([triangles[..., 0], triangles[..., 2], -triangles[..., 1]], axis=-1)
@@ -76,20 +78,19 @@ def render_image(triangles, size):
     return image
 
 
-def render_thumbnail(data: bytes, size: int):
+def render_thumbnail(source: Path, size: int):
     """Miniature de toutes les faces ; dessin échantillonné seulement si OpenGL manque.
 
     Renvoie (image, simplifiée). Un fichier invalide lève ValueError, sans repli.
     """
     size = max(16, min(size, 1024))
-    mesh = gpu_rendering.decode_mesh(data)
+    mesh = load_model(source)
     try:
         with gpu_rendering.MeshRenderer(mesh) as renderer:
             yaw, pitch, zoom = DEFAULT_VIEW
             return renderer.render(size, size, yaw=yaw, pitch=pitch, zoom=zoom, up=UP_AXIS), False
     except RuntimeError:
-        del mesh
-        triangles, reduced = prepare_mesh(data)
+        triangles, reduced = sample_triangles(mesh)
         return render_image(triangles, size), reduced
 
 
@@ -128,7 +129,7 @@ class Preview(QWidget):
 
     def load(self, source):
         try:
-            self.loaded.emit(gpu_rendering.decode_mesh(Path(source).read_bytes()), '')
+            self.loaded.emit(load_model(Path(source)), '')
         except Exception as exc:
             self.loaded.emit(None, str(exc))
 
@@ -139,11 +140,8 @@ class Preview(QWidget):
                 self.renderer = gpu_rendering.MeshRenderer(mesh)
                 QApplication.instance().aboutToQuit.connect(self.renderer.close)
             except RuntimeError:
-                try:
-                    self.triangles, reduced = prepare_mesh(Path(self.source).read_bytes())
-                    message = SIMPLIFIED if reduced else ''
-                except Exception as exc:
-                    message = str(exc)
+                self.triangles, reduced = sample_triangles(mesh)
+                message = SIMPLIFIED if reduced else ''
         self.message = message
         Path(self.source).with_name("ready").touch()
         self.update()
@@ -228,7 +226,7 @@ def main():
     args = parser.parse_args()
     app = QApplication([])
     if args.output:
-        image, _ = render_thumbnail(Path(args.input).read_bytes(), args.size)
+        image, _ = render_thumbnail(Path(args.input), args.size)
         return 0 if image.save(args.output) else 2
     widget = Preview(args.input, args.parent)
     return app.exec()

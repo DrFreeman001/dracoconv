@@ -1,11 +1,12 @@
-# Prototype d’extension Windows Draco
+# Prototype d’extension Windows Draco et STEP
 
-Prototype de faisabilité : deux classes COM x64, miniatures et aperçu 3D isolés. Lire [verification.md](verification.md) avant utilisation. Ne pas présenter cette version comme une extension finale pour toute la collection.
+Prototype de faisabilité : deux classes COM x64, miniatures et aperçu 3D isolés, pour `.drc`, `.step` et `.stp`. Lire [verification.md](verification.md) avant utilisation. Ne pas présenter cette version comme une extension finale pour toute la collection.
 
 Depuis la racine du dépôt, PowerShell :
 
 ```powershell
 .venv/Scripts/python.exe windows/preview/configure.py
+python -I windows/preview/fetch_occt.py   # une fois : OpenCascade pour STEP, dans third_party
 ./windows/preview/build.ps1
 .venv/Scripts/python.exe -m pytest tests/test_shell_preview.py tests/test_shell_registration.py -q
 ./windows/preview/build/probe.exe
@@ -14,7 +15,7 @@ Depuis la racine du dépôt, PowerShell :
 ./windows/preview/build/cache_probe.exe (Join-Path $PWD 'windows\preview\cube.drc')
 ```
 
-Dans Explorer, sélectionner `windows/preview/cube.drc`, ouvrir le volet avec Alt+P. Glisser pour tourner, molette pour zoomer, R pour réinitialiser. L’installation est par utilisateur, uniquement les gestionnaires `.drc`. Elle refuse les gestionnaires étrangers trouvés directement ou par ProgID associé, y compris UserChoice ; le programme d’ouverture par défaut reste intact.
+Dans Explorer, sélectionner `windows/preview/cube.drc`, ouvrir le volet avec Alt+P. Glisser pour tourner, molette pour zoomer, R pour réinitialiser. L’installation est par utilisateur, uniquement les gestionnaires `.drc`, `.step` et `.stp`. Pour STEP, ils sont inscrits sous `SystemFileAssociations` : la clé `.step` de l’utilisateur appartient au trancheur associé, qui la réécrit et y efface les sous-clés `shellex` (constaté le 13 novembre 2026). Elle refuse les gestionnaires étrangers trouvés directement ou par ProgID associé, y compris UserChoice ; le programme d’ouverture par défaut reste intact.
 
 Retrait :
 
@@ -26,6 +27,8 @@ Retrait :
 Conserver `build/registration.json` tant que l’installation est active : ce manifeste permet le retour exact des valeurs antérieures. Le retrait laisse intactes les valeurs modifiées entre-temps par une autre application. Les chemins Python/source sont propres à cette copie du dépôt dans `build/preview.ini` ; garder les fichiers en place pendant l’essai. Ne pas exécuter test_failure.py pendant une installation active : il remplace temporairement ce fichier de configuration pour simuler un auxiliaire défaillant.
 
 Limites : 64 Mio comprimés, 1536 Mio par job, 20 s pour une miniature ou le chargement initial. Toutes les faces sont dessinées par OpenGL ; sans OpenGL, un dessin échantillonné de 12 000 faces prend le relais et l’annonce. Le clavier ne fonctionne qu’après un clic dans le modèle (R pour réinitialiser) : Tab et Maj+Tab n’entrent pas dans l’aperçu et n’en sortent pas. Ne jamais arrêter `prevhost.exe` de force pendant qu’Explorer tourne : l’aperçu resterait vide jusqu’au redémarrage d’Explorer. Pour recharger la DLL : arrêter Explorer, puis les `prevhost.exe`, puis relancer Explorer. Le lancement Python dans le venv utilise un petit processus relais ; les descendants restent dans le job tué à la fermeture. L’aperçu et les miniatures ont chacun une limite de concurrence de1. Aucun réglage d’isolation Windows n’est modifié.
+
+STEP : le format est reconnu au contenu (`ISO-10303-21`), pas au nom. L’auxiliaire lance `build/step/step_mesh.exe`, programme natif lié à OpenCascade 8.0.1, dans le même job : il lit le fichier, le découpe en triangles (flèche 0,1 % de la plus grande dimension) et écrit `model.mesh` dans le dossier temporaire, supprimé après lecture. Il a 16 s. `stage_step.py` copie à côté de lui les 45 DLL nécessaires (46 Mo, dont FreeImage et FreeType qu’OpenCascade charge sans s’en servir ici) ; le runtime Visual C++ reste celui de Windows. Le paquet OpenCascade de conda-forge est choisi plutôt que la bibliothèque Python OCP : importer OCP réserve à lui seul 860 Mo, ce qui dépasse la limite du job une fois le rendu ajouté. Une seule couleur, sans les couleurs de pièces du fichier.
 
 `inspect_integrity.py PID...` relève les niveaux d’intégrité sans modifier les processus. Les entrées temporaires sont privées au profil utilisateur sous LocalLow/DracoConvPreview et supprimées au déchargement normal. Une interruption brutale de l’hôte peut laisser un dossier temporaire ; une collecte de ces restes reste à implémenter avant distribution.
 

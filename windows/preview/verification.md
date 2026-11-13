@@ -45,3 +45,23 @@ Le code de diagnostic a été retiré ; le pont et l'auxiliaire sont revenus à 
 **Un seul aperçu vivant à la fois (voulu).** Un verrou global limite l'aperçu à une instance. Si deux fenêtres Explorer affichent le volet d'aperçu, la seconde reste vide tant que la première montre un `.drc`. Limite connue, non corrigée.
 
 **Reste ouvert.** Après un arrêt brutal de l'hôte, les dossiers temporaires (avec la copie du modèle, jusqu'à 64 Mio) restent dans `LocalLow\DracoConvPreview`. Le nettoyage natif de ces dossiers abandonnés n'est pas fait. Ceux de nos essais ont été supprimés à la main.
+
+## 13 novembre 2026 — aperçu et miniatures STEP
+
+Collection : 69 fichiers STEP, 122 Mo, le plus gros 33 Mo. Sources lues seulement ; SHA-256 des trois fichiers d'essai inchangés.
+
+**Choix du lecteur.** Mesuré sur « The 100 v11-beta1-5.step » (33 Mo, 466 253 triangles) :
+- OCP (OpenCascade pour Python) : 10 s, mais 864 Mo réservés dès l'import, 1 373 Mo au pic ; 555 Mo installés avec VTK, obligatoire à l'import.
+- gmsh : pas fini en 2 minutes.
+- `step_mesh.exe`, natif, OpenCascade 8.0.1 de conda-forge : 9 s, 526 Mo au pic. Retenu.
+
+**Explorer réel, faible intégrité.**
+- The 100 : aperçu complet en 10,6 s ; pic 454 Mo pour `step_mesh`, 828 Mo pour l'auxiliaire, 1 231 Mo cumulés, sous la limite de 1 536 Mio.
+- Bloc d'essai `tests/data/tall_block.step` : debout, trou sur le dessus.
+- Miniatures neuves (copies hors cache) de la bobine PETmachine, de la carte BTT EBB42 et de The 100 : complètes. Type affiché « Orca.Slicer.1 » : programme par défaut inchangé.
+- Dossier temporaire supprimé à la fermeture, `model.mesh` compris.
+- Une seconde fenêtre affiche désormais « Un autre apercu 3D est deja ouvert dans une autre fenetre. » au lieu d'un volet vide.
+
+**Piège : clé `.step` réécrite.** Inscrits d'abord sous `HKCU\Software\Classes\.step\shellex`, les gestionnaires disparaissaient (pour `.step` et `.stp`) dès qu'Explorer affichait un fichier STEP ; la valeur par défaut « Orca.Slicer.1 » restait. Sous `SystemFileAssociations\.step` et `.stp`, ils tiennent. L'auteur de l'effacement n'est pas identifié (pas d'outil de traçage sans élévation).
+
+**Reste ouvert.** Les couleurs de pièces ne sont pas lues. Un STEP proche de 64 Mo pourrait dépasser 16 s ou la limite mémoire : l'aperçu afficherait alors une erreur, sans risque pour le fichier.

@@ -14,7 +14,7 @@ import re
 import stat
 
 _MARKER = b"DracoConvPreview lease v1\n"
-_NAMES = {"input.drc", "thumb.png", "ready", "events.log", "lease.v1"}
+_NAMES = {"input.drc", "model.mesh", "model.mesh.part", "thumb.png", "ready", "events.log", "lease.v1"}
 _GUID = re.compile(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}")
 
 

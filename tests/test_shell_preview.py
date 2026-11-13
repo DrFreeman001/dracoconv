@@ -8,6 +8,12 @@ def encoded():
     return DracoPy.encode(np.array([[0.,0.,0.],[1.,0.,0.],[0.,1.,0.],[0.,0.,1.]]), np.array([[0,1,2],[0,2,3]], dtype=np.uint32))
 
 
+def stored(tmp_path, data=None):
+    path = tmp_path / 'input.drc'
+    path.write_bytes(encoded() if data is None else data)
+    return path
+
+
 def test_invalid_and_point_cloud():
     with pytest.raises(ValueError): prepare_mesh(b'invalid')
     with pytest.raises(ValueError, match='point'): prepare_mesh(DracoPy.encode(np.array([[0.,0.,0.],[1.,1.,1.]])))
@@ -30,7 +36,7 @@ def test_thumbnail_has_geometry(qapp, tmp_path):
     assert len({image.pixel(x,y) for x in range(128) for y in range(128)}) > 2
 
 
-def test_thumbnail_uses_every_face_when_opengl_works(monkeypatch):
+def test_thumbnail_uses_every_face_when_opengl_works(monkeypatch, tmp_path):
     from dracoconv import shell_preview
     calls = {}
 
@@ -46,28 +52,59 @@ def test_thumbnail_uses_every_face_when_opengl_works(monkeypatch):
             return 'image'
 
     monkeypatch.setattr(shell_preview.gpu_rendering, 'MeshRenderer', FakeRenderer)
-    image, simplified = shell_preview.render_thumbnail(encoded(), 5000)
+    image, simplified = shell_preview.render_thumbnail(stored(tmp_path), 5000)
     assert image == 'image' and not simplified
     assert calls == {'faces': 2, 'render': (1024, 1024, 'z'), 'closed': True}
 
 
-def test_thumbnail_falls_back_to_sampled_drawing_without_opengl(qapp, monkeypatch):
+def test_thumbnail_falls_back_to_sampled_drawing_without_opengl(qapp, monkeypatch, tmp_path):
     from dracoconv import shell_preview
 
     def unavailable(mesh):
         raise RuntimeError('OpenGL context unavailable')
 
     monkeypatch.setattr(shell_preview.gpu_rendering, 'MeshRenderer', unavailable)
-    image, simplified = shell_preview.render_thumbnail(encoded(), 64)
+    image, simplified = shell_preview.render_thumbnail(stored(tmp_path), 64)
     assert image.width() == 64 and not simplified
 
 
-def test_invalid_input_is_not_hidden_by_the_fallback():
+def test_invalid_input_is_not_hidden_by_the_fallback(tmp_path):
     from dracoconv import shell_preview
     with pytest.raises(ValueError):
-        shell_preview.render_thumbnail(b'invalid', 64)
+        shell_preview.render_thumbnail(stored(tmp_path, b'invalid'), 64)
 
 
 def test_preview_limit_matches_renderer_limit():
     from dracoconv import preview_rendering, shell_preview
     assert shell_preview.MAX_INPUT == preview_rendering.MAX_INPUT == 64 * 1024 * 1024
+
+
+def test_load_model_reads_draco_by_content(tmp_path):
+    from dracoconv import shell_preview
+    mesh = shell_preview.load_model(stored(tmp_path))
+    assert len(mesh.faces) == 2
+
+
+def test_load_model_rejects_oversized_and_empty_inputs(tmp_path, monkeypatch):
+    from dracoconv import shell_preview
+    with pytest.raises(ValueError, match='limit'):
+        shell_preview.load_model(stored(tmp_path, b''))
+    monkeypatch.setattr(shell_preview, 'MAX_INPUT', 10)
+    with pytest.raises(ValueError, match='limit'):
+        shell_preview.load_model(stored(tmp_path))
+
+
+def test_load_model_sends_step_to_the_step_reader(tmp_path, monkeypatch):
+    from dracoconv import shell_preview
+    calls = []
+    monkeypatch.setattr(shell_preview.step_preview, 'mesh_step', lambda source, output: calls.append((source, output)) or 'mesh')
+    source = stored(tmp_path, b'ISO-10303-21;\nHEADER;\n')
+    assert shell_preview.load_model(source) == 'mesh'
+    assert calls == [(source, tmp_path / 'model.mesh')]
+
+
+def test_sampled_fallback_comes_from_the_decoded_mesh(tmp_path):
+    from dracoconv import shell_preview
+    mesh = shell_preview.load_model(stored(tmp_path))
+    tris, reduced = shell_preview.sample_triangles(mesh, 1)
+    assert tris.shape == (1, 3, 3) and reduced

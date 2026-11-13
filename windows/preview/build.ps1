@@ -17,3 +17,15 @@ foreach($name in @('preview_probe','cache_probe')) {
  & "$vc/bin/Hostx64/x64/cl.exe" /nologo /utf-8 /EHsc /std:c++17 "$PSScriptRoot/$name.cpp" /Fo"$PSScriptRoot/build/$name.obj" /Fe"$PSScriptRoot/build/$name.exe" /link ole32.lib shell32.lib shlwapi.lib user32.lib uuid.lib
  if($LASTEXITCODE){throw "$name compile failed"}
 }
+
+# Lecteur STEP : OpenCascade 8.0.1 (paquet conda-forge « novtk ») et ses DLL dans third_party, voir README.
+$occt="$PSScriptRoot/../../third_party/occt-8.0.1/Library"
+if(Test-Path "$occt/include/opencascade"){
+ New-Item -ItemType Directory -Force "$PSScriptRoot/build/step" | Out-Null
+ $env:INCLUDE="$env:INCLUDE;$occt/include/opencascade"
+ $env:LIB="$env:LIB;$occt/lib"
+ & "$vc/bin/Hostx64/x64/cl.exe" /nologo /utf-8 /EHsc /std:c++17 /O2 /MD /W3 /DUNICODE /D_UNICODE /DWNT "$PSScriptRoot/step_mesh.cpp" /Fo"$PSScriptRoot/build/step_mesh.obj" /Fe"$PSScriptRoot/build/step/step_mesh.exe" /link TKernel.lib TKMath.lib TKBRep.lib TKG2d.lib TKG3d.lib TKGeomBase.lib TKTopAlgo.lib TKMesh.lib TKDESTEP.lib TKXSBase.lib TKDE.lib
+ if($LASTEXITCODE){throw 'step_mesh compile failed'}
+ & "$PSScriptRoot/../../.venv/Scripts/python.exe" -I "$PSScriptRoot/stage_step.py" "$vc/bin/Hostx64/x64/dumpbin.exe"
+ if($LASTEXITCODE){throw 'step_mesh staging failed'}
+}

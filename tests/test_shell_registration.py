@@ -37,3 +37,30 @@ def test_default_progid_handler_is_not_overwritten(monkeypatch):
         return None
     monkeypatch.setattr(register,'current',read)
     with pytest.raises(RuntimeError,match='handler'): register.values()
+
+
+def test_step_extensions_get_both_handlers(monkeypatch):
+    monkeypatch.setattr(register,'current',lambda path,name,root=winreg.HKEY_CURRENT_USER: None)
+    rows={(path,value) for path,name,value in register.values() if '\\shellex\\' in path}
+    # STEP passe par SystemFileAssociations : un trancheur réécrit HKCU\Software\Classes\.step et y efface shellex.
+    for base in ('Software\\Classes\\.drc','Software\\Classes\\SystemFileAssociations\\.step','Software\\Classes\\SystemFileAssociations\\.stp'):
+        assert (base+'\\shellex\\{E357FCCD-A995-4576-B01F-234630154E96}',register.THUMB) in rows
+        assert (base+'\\shellex\\{8895B1C6-B41F-4C1C-A562-0D564250836F}',register.PREVIEW) in rows
+    assert not any(path.startswith('Software\\Classes\\.step') for path,_ in rows)
+
+
+def test_existing_system_association_handler_is_not_overwritten(monkeypatch):
+    def read(path,name,root=winreg.HKEY_CURRENT_USER):
+        if path.startswith('SystemFileAssociations\\.stp\\shellex\\'): return ['{foreign}',winreg.REG_SZ]
+        return None
+    monkeypatch.setattr(register,'current',read)
+    with pytest.raises(RuntimeError,match='handler'): register.values()
+
+
+def test_step_progid_handler_is_not_overwritten(monkeypatch):
+    def read(path,name,root=winreg.HKEY_CURRENT_USER):
+        if path=='.step': return ['Orca.Slicer.1',winreg.REG_SZ]
+        if path.startswith('Orca.Slicer.1\\shellex\\'): return ['{foreign}',winreg.REG_SZ]
+        return None
+    monkeypatch.setattr(register,'current',read)
+    with pytest.raises(RuntimeError,match='handler'): register.values()
