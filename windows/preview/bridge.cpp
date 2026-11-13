@@ -19,7 +19,7 @@ static void log(const std::wstring& dir,const wchar_t* event,DWORD value=0){
  if(f!=INVALID_HANDLE_VALUE){char line[160];int n=sprintf_s(line,"pid=%lu %ls value=%lu\r\n",GetCurrentProcessId(),event,value);DWORD out;WriteFile(f,line,n,&out,nullptr);CloseHandle(f);}
 }
 class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPreviewHandler,public IObjectWithSite,public IOleWindow{
- long refs=1; bool thumbnail;std::wstring dir,input;HANDLE job=nullptr,process=nullptr,previewGate=nullptr;ULONGLONG started=0;bool ready=false;HWND parent=nullptr,window=nullptr;RECT rect{};IUnknown*site=nullptr;
+ long refs=1; bool thumbnail;std::wstring dir,input;HANDLE job=nullptr,process=nullptr,previewGate=nullptr;ULONGLONG started=0;bool ready=false;HWND parent=nullptr,window=nullptr;RECT rect{};IUnknown*site=nullptr;HWND lastFocus=nullptr;
  void stopHelper(){
   if(window)KillTimer(window,1);
   if(job){CloseHandle(job);job=nullptr;}
@@ -31,13 +31,22 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
   if(message==WM_NCCREATE){self=static_cast<Handler*>(reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
   if(self&&message==WM_TIMER){self->monitor();return 0;}
   if(self&&message==WM_SETFOCUS){HWND child=::GetWindow(hwnd,GW_CHILD);if(child)::SetFocus(child);return 0;}
-  if(self&&message==WM_APP+1){MSG key{};key.hwnd=hwnd;key.message=WM_KEYDOWN;key.wParam=VK_TAB;key.lParam=lp;self->TranslateAccelerator(&key);return 0;}
+  if(self&&message==WM_APP+1){
+   BYTE previous[256]{};GetKeyboardState(previous);BYTE keys[256];CopyMemory(keys,previous,sizeof(keys));
+   keys[VK_SHIFT]=wp?0:0x80;SetKeyboardState(keys);
+   MSG key{};key.hwnd=::GetWindow(hwnd,GW_CHILD);key.message=WM_KEYDOWN;key.wParam=VK_TAB;key.lParam=1|(MapVirtualKeyW(VK_TAB,MAPVK_VK_TO_VSC)<<16);key.time=GetTickCount();
+   log(self->dir,L"tab-shift",GetKeyState(VK_SHIFT)&0x8000);HRESULT result=self->TranslateAccelerator(&key);log(self->dir,L"tab-result",result);
+   SetKeyboardState(previous);return result;
+  }
   if(message==WM_PAINT){PAINTSTRUCT ps;HDC dc=BeginPaint(hwnd,&ps);RECT area;GetClientRect(hwnd,&area);FillRect(dc,&area,(HBRUSH)(COLOR_WINDOW+1));wchar_t text[256];GetWindowTextW(hwnd,text,256);area.left+=12;area.top+=12;DrawTextW(dc,text,-1,&area,DT_WORDBREAK);EndPaint(hwnd,&ps);return 0;}
   if(message==WM_SETTEXT){LRESULT result=DefWindowProcW(hwnd,message,wp,lp);InvalidateRect(hwnd,nullptr,TRUE);return result;}
   return DefWindowProcW(hwnd,message,wp,lp);
  }
  void monitor(){
   if(!process)return;
+  GUITHREADINFO foreground{};foreground.cbSize=sizeof(foreground);GetGUIThreadInfo(0,&foreground);HWND focused=foreground.hwndFocus;
+  if(focused!=lastFocus){lastFocus=focused;log(dir,L"focus-hwnd",DWORD(reinterpret_cast<ULONG_PTR>(focused)));DWORD pid=0;GetWindowThreadProcessId(focused,&pid);log(dir,L"focus-pid",pid);}
+
   if(GetFileAttributesW((dir+L"\\ready").c_str())!=INVALID_FILE_ATTRIBUTES)ready=true;
   if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>20000)){
    stopHelper();SetWindowTextW(window,L"Apercu indisponible : chargement interrompu ou limite atteinte.");

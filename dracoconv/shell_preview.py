@@ -152,14 +152,30 @@ class Preview(QWidget):
         self.zoom = float(np.clip(self.zoom * 1.15 ** (event.angleDelta().y()/120), .2, 5))
         self.update()
 
+    def trace(self, event):
+        with Path(self.source).with_name("events.log").open("a", encoding="utf-8") as output:
+            output.write(f"qt {event}\n")
+
+    def focusInEvent(self, event):
+        self.trace("focus-in")
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        self.trace("focus-out")
+        super().focusOutEvent(event)
+
     def focusNextPrevChild(self, forward):
+        self.trace(f"tab forward={forward}")
         user32 = ctypes.WinDLL("user32", use_last_error=True)
-        user32.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
-        user32.PostMessageW(self.parent_hwnd, 0x8001, 0x09, 0)
+        user32.SendMessageTimeoutW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_size_t)]
+        user32.SendMessageTimeoutW.restype = ctypes.c_ssize_t
+        result = ctypes.c_size_t()
+        user32.SendMessageTimeoutW(self.parent_hwnd, 0x8001, int(forward), 0, 2, 1000, ctypes.byref(result))
         return True
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_R:
+            self.trace("reset")
             self.yaw, self.pitch, self.zoom = 30., -20., 1.
             self.update()
         else:
