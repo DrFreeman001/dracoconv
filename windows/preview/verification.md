@@ -31,4 +31,17 @@ Le code de diagnostic a été retiré ; le pont et l'auxiliaire sont revenus à 
 
 **Piège : ne jamais arrêter `prevhost.exe` de force.** Explorer garde alors la fenêtre hôte du processus mort et la repasse à chaque `SetWindow` (`IsWindow` = 0, rectangle 0 × 0, `CreateWindowEx` en erreur 1400). L'aperçu reste vide dans ce processus Explorer jusqu'à son redémarrage. Constaté deux fois, dans deux processus Explorer distincts. Pour recharger la DLL après recompilation : renommer la DLL chargée, recompiler, puis redémarrer Explorer.
 
-**Rendu complet.** L'auxiliaire dessine toutes les faces par OpenGL (`dracoconv/preview_rendering.py`), pour l'aperçu comme pour la miniature. Le dessin échantillonné ne sert plus que de secours quand OpenGL manque, et l'affiche (« Affichage simplifié »). Vue Z en haut, comme les trancheurs, légèrement par-dessus. Limite d'entrée portée à 64 Mio dans le pont et l'auxiliaire. Miniatures 512 px produites par l'auxiliaire, en processus normal, pour Genius (334 858 faces) et le Bouddha (2 909 880 faces, 43,5 Mo) : surfaces pleines, sources inchangées (SHA-256). Le Bouddha, orienté Y en haut dans son fichier, apparaît couché, comme dans OrcaSlicer.
+**Rendu complet.** L'auxiliaire dessine toutes les faces par OpenGL (`dracoconv/preview_rendering.py`), pour l'aperçu comme pour la miniature. Le dessin échantillonné ne sert plus que de secours quand OpenGL manque, et l'affiche (« Affichage simplifié »). Vue Z en haut, comme les trancheurs, légèrement par-dessus. Limite d'entrée portée à 64 Mio dans le pont et l'auxiliaire. Miniatures 512 px produites par l'auxiliaire, en processus normal, pour Genius (334 858 faces) et le Bouddha (2 909 880 faces, 43,5 Mo) : surfaces pleines, sources inchangées (SHA-256). Les deux modèles apparaissent debout (correction : une note précédente annonçait le Bouddha couché, à tort).
+
+**Validation dans le vrai Explorer (faible intégrité), 13 novembre au soir.** Après redémarrage d'Explorer, DLL compilée à 17 h 13 (limite 64 Mio) chargée.
+- Aperçu Genius (334 858 faces) : toutes les faces, debout, sans mention « Affichage simplifié ».
+- Aperçu Bouddha (2 909 880 faces, 43,5 Mo) : prêt en 1,9 s, toutes les faces, debout. Mémoire de l'auxiliaire : 893 Mo privés, 230 Mo de pointe en mémoire vive, sous la limite de 1 536 Mio de l'objet job.
+- Miniatures neuves (copies des deux modèles dans un dossier d'essai, donc hors cache) : surfaces pleines et debout. Copies supprimées ensuite.
+- SHA-256 des deux sources inchangés.
+- Les dossiers temporaires des aperçus fermés normalement ont été supprimés par l'extension.
+
+**Hôte d'aperçu resté bloqué.** Redémarrer Explorer ne suffit pas quand un ancien `prevhost.exe` survit avec une ancienne DLL : Explorer le réutilise (fenêtre 0 × 0, verrou d'aperçu occupé). Procédure sûre : arrêter Explorer, puis seulement alors arrêter les `prevhost.exe`, puis relancer Explorer. Arrêter `prevhost` pendant qu'Explorer tourne reste à proscrire.
+
+**Un seul aperçu vivant à la fois (voulu).** Un verrou global limite l'aperçu à une instance. Si deux fenêtres Explorer affichent le volet d'aperçu, la seconde reste vide tant que la première montre un `.drc`. Limite connue, non corrigée.
+
+**Reste ouvert.** Après un arrêt brutal de l'hôte, les dossiers temporaires (avec la copie du modèle, jusqu'à 64 Mio) restent dans `LocalLow\DracoConvPreview`. Le nettoyage natif de ces dossiers abandonnés n'est pas fait. Ceux de nos essais ont été supprimés à la main.
