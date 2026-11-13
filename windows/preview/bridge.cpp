@@ -15,12 +15,11 @@ static const CLSID previewId={0x06b7d1b9,0xcdef,0x4966,{0x87,0x02,0x88,0x80,0xe7
 static HRESULT error(){return HRESULT_FROM_WIN32(GetLastError());}
 static std::wstring quote(const std::wstring& s){return L"\""+s+L"\"";}
 static void log(const std::wstring& dir,const wchar_t* event,DWORD value=0){
- if(dir.empty())return;std::wstring path=dir.substr(0,dir.find_last_of(L'\\'))+L"\\trace.log";
- HANDLE f=CreateFileW(path.c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,0,nullptr);
- if(f!=INVALID_HANDLE_VALUE){SYSTEMTIME t;GetLocalTime(&t);char line[200];int n=sprintf_s(line,"%02u:%02u:%02u.%03u bridge pid=%lu %ls value=%lu\r\n",t.wHour,t.wMinute,t.wSecond,t.wMilliseconds,GetCurrentProcessId(),event,value);DWORD out;WriteFile(f,line,n,&out,nullptr);CloseHandle(f);}
+ HANDLE f=CreateFileW((dir+L"\\events.log").c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,0,nullptr);
+ if(f!=INVALID_HANDLE_VALUE){char line[160];int n=sprintf_s(line,"pid=%lu %ls value=%lu\r\n",GetCurrentProcessId(),event,value);DWORD out;WriteFile(f,line,n,&out,nullptr);CloseHandle(f);}
 }
 class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPreviewHandler,public IObjectWithSite,public IOleWindow{
- long refs=1; bool thumbnail;std::wstring dir,input;HANDLE job=nullptr,process=nullptr,previewGate=nullptr;ULONGLONG started=0;bool ready=false;HWND parent=nullptr,window=nullptr;RECT rect{};IUnknown*site=nullptr;HWND lastFocus=nullptr;
+ long refs=1; bool thumbnail;std::wstring dir,input;HANDLE job=nullptr,process=nullptr,previewGate=nullptr;ULONGLONG started=0;bool ready=false;HWND parent=nullptr,window=nullptr;RECT rect{};IUnknown*site=nullptr;
  void stopHelper(){
   if(window)KillTimer(window,1);
   if(job){CloseHandle(job);job=nullptr;}
@@ -32,22 +31,13 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
   if(message==WM_NCCREATE){self=static_cast<Handler*>(reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
   if(self&&message==WM_TIMER){self->monitor();return 0;}
   if(self&&message==WM_SETFOCUS){HWND child=::GetWindow(hwnd,GW_CHILD);if(child)::SetFocus(child);return 0;}
-  if(self&&message==WM_APP+1){log(self->dir,L"wm-app-tab-forward",DWORD(wp));
-   BYTE previous[256]{};GetKeyboardState(previous);BYTE keys[256];CopyMemory(keys,previous,sizeof(keys));
-   keys[VK_SHIFT]=wp?0:0x80;SetKeyboardState(keys);
-   MSG key{};key.hwnd=::GetWindow(hwnd,GW_CHILD);key.message=WM_KEYDOWN;key.wParam=VK_TAB;key.lParam=1|(MapVirtualKeyW(VK_TAB,MAPVK_VK_TO_VSC)<<16);key.time=GetTickCount();
-   log(self->dir,L"tab-shift",GetKeyState(VK_SHIFT)&0x8000);HRESULT result=self->TranslateAccelerator(&key);log(self->dir,L"tab-result",result);
-   SetKeyboardState(previous);return result;
-  }
+  if(self&&message==WM_APP+1){MSG key{};key.hwnd=hwnd;key.message=WM_KEYDOWN;key.wParam=VK_TAB;key.lParam=lp;self->TranslateAccelerator(&key);return 0;}
   if(message==WM_PAINT){PAINTSTRUCT ps;HDC dc=BeginPaint(hwnd,&ps);RECT area;GetClientRect(hwnd,&area);FillRect(dc,&area,(HBRUSH)(COLOR_WINDOW+1));wchar_t text[256];GetWindowTextW(hwnd,text,256);area.left+=12;area.top+=12;DrawTextW(dc,text,-1,&area,DT_WORDBREAK);EndPaint(hwnd,&ps);return 0;}
   if(message==WM_SETTEXT){LRESULT result=DefWindowProcW(hwnd,message,wp,lp);InvalidateRect(hwnd,nullptr,TRUE);return result;}
   return DefWindowProcW(hwnd,message,wp,lp);
  }
  void monitor(){
   if(!process)return;
-  GUITHREADINFO foreground{};foreground.cbSize=sizeof(foreground);GetGUIThreadInfo(0,&foreground);HWND focused=foreground.hwndFocus;
-  if(focused!=lastFocus){lastFocus=focused;log(dir,L"focus-hwnd",DWORD(reinterpret_cast<ULONG_PTR>(focused)));DWORD pid=0;GetWindowThreadProcessId(focused,&pid);log(dir,L"focus-pid",pid);}
-
   if(GetFileAttributesW((dir+L"\\ready").c_str())!=INVALID_FILE_ATTRIBUTES)ready=true;
   if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>20000)){
    stopHelper();SetWindowTextW(window,L"Apercu indisponible : chargement interrompu ou limite atteinte.");
@@ -58,7 +48,7 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
  wchar_t config[MAX_PATH];GetModuleFileNameW(module,config,MAX_PATH);PathRemoveFileSpecW(config);PathAppendW(config,L"preview.ini");
  wchar_t python[32768],script[32768];GetPrivateProfileStringW(L"helper",L"python",L"",python,32768,config);GetPrivateProfileStringW(L"helper",L"script",L"",script,32768,config);
  if(!*python||!*script)return E_UNEXPECTED;
- if(!thumbnail){previewGate=CreateMutexW(nullptr,FALSE,L"Local\\DracoConvPreview-06B7D1B9");if(!previewGate)return error();DWORD wait=WaitForSingleObject(previewGate,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED){log(dir,L"gate-busy",wait);CloseHandle(previewGate);previewGate=nullptr;return HRESULT_FROM_WIN32(ERROR_BUSY);}}
+ if(!thumbnail){previewGate=CreateMutexW(nullptr,FALSE,L"Local\\DracoConvPreview-06B7D1B9");if(!previewGate)return error();DWORD wait=WaitForSingleObject(previewGate,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED){CloseHandle(previewGate);previewGate=nullptr;return HRESULT_FROM_WIN32(ERROR_BUSY);}}
  job=CreateJobObjectW(nullptr,nullptr);if(!job)return error();
  JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_JOB_MEMORY|JOB_OBJECT_LIMIT_ACTIVE_PROCESS;limits.ProcessMemoryLimit=1536ull*1024*1024;limits.JobMemoryLimit=1536ull*1024*1024;limits.BasicLimitInformation.ActiveProcessLimit=4;
  if(!SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits)))return error();
@@ -89,7 +79,7 @@ public:
  if(!CreateDirectoryW(dir.c_str(),nullptr))return error();input=dir+L"\\input.drc";
  HANDLE f=CreateFileW(input.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_TEMPORARY,nullptr);if(f==INVALID_HANDLE_VALUE){hr=error();cleanup();return hr;}
  char buffer[65536];ULONG got=0;size_t total=0;
- do{hr=stream->Read(buffer,sizeof(buffer),&got);if(FAILED(hr))break;total+=got;if(total>32*1024*1024){hr=HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);break;}DWORD written;if(got&&(!WriteFile(f,buffer,got,&written,nullptr)||written!=got)){hr=error();break;}}while(got);
+ do{hr=stream->Read(buffer,sizeof(buffer),&got);if(FAILED(hr))break;total+=got;if(total>64*1024*1024){hr=HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);break;}DWORD written;if(got&&(!WriteFile(f,buffer,got,&written,nullptr)||written!=got)){hr=error();break;}}while(got);
  CloseHandle(f);if(FAILED(hr)||!total){cleanup();return FAILED(hr)?hr:E_INVALIDARG;}log(dir,L"initialized");return S_OK;
  }
  HRESULT STDMETHODCALLTYPE GetThumbnail(UINT cx,HBITMAP*out,WTS_ALPHATYPE*alpha)override{
@@ -109,22 +99,22 @@ public:
  }
  ReleaseMutex(mutex);CloseHandle(mutex);cleanup();return hr;
  }
- HRESULT STDMETHODCALLTYPE SetWindow(HWND hwnd,const RECT*r)override{log(dir,L"set-window",DWORD(reinterpret_cast<ULONG_PTR>(hwnd)));{DWORD owner=0;DWORD tid=GetWindowThreadProcessId(hwnd,&owner);log(dir,L"set-window-valid",IsWindow(hwnd));log(dir,L"set-window-owner",owner);log(dir,L"set-window-tid",tid);log(dir,L"self-tid",GetCurrentThreadId());}if(!r)return E_POINTER;parent=hwnd;rect=*r;if(window)SetParent(window,parent);return SetRect(r);}
+ HRESULT STDMETHODCALLTYPE SetWindow(HWND hwnd,const RECT*r)override{if(!r)return E_POINTER;parent=hwnd;rect=*r;if(window)SetParent(window,parent);return SetRect(r);}
  HRESULT STDMETHODCALLTYPE SetRect(const RECT*r)override{if(!r)return E_POINTER;rect=*r;if(window)MoveWindow(window,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,TRUE);return S_OK;}
  HRESULT STDMETHODCALLTYPE DoPreview()override{
- log(dir,L"do-preview",parent?1:0);log(dir,L"do-preview-valid",IsWindow(parent));log(dir,L"rect-w",rect.right-rect.left);log(dir,L"rect-h",rect.bottom-rect.top);if(!parent||input.empty())return E_UNEXPECTED;if(window)return S_FALSE;
+ if(!parent||input.empty())return E_UNEXPECTED;if(window)return S_FALSE;
  WNDCLASSW cls{};cls.lpfnWndProc=procedure;cls.hInstance=module;cls.lpszClassName=L"DracoConvPreviewContainer";cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);
  if(!RegisterClassW(&cls)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return error();
  window=CreateWindowExW(0,cls.lpszClassName,L"Chargement Draco...",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN|WS_TABSTOP,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,parent,nullptr,module,this);
- if(!window){log(dir,L"create-window",GetLastError());return error();}HRESULT hr=launch(L"--parent "+std::to_wstring((uintptr_t)window));
+ if(!window)return error();HRESULT hr=launch(L"--parent "+std::to_wstring((uintptr_t)window));
  if(FAILED(hr)){stopHelper();SetWindowTextW(window,L"Apercu indisponible : impossible de lancer le processus.");}
  else{started=GetTickCount64();ready=false;SetTimer(window,1,200,nullptr);}return hr;
  }
  HRESULT STDMETHODCALLTYPE Unload()override{cleanup();return S_OK;}
- HRESULT STDMETHODCALLTYPE SetFocus()override{log(dir,L"handler-setfocus",window?1:0);if(!window)return E_FAIL;HWND child=::GetWindow(window,GW_CHILD);HWND previous=::SetFocus(child?child:window);log(dir,L"handler-setfocus-error",previous?0:GetLastError());log(dir,L"handler-setfocus-now",DWORD(reinterpret_cast<ULONG_PTR>(::GetFocus())));return S_OK;}
- HRESULT STDMETHODCALLTYPE QueryFocus(HWND*out)override{log(dir,L"handler-queryfocus");if(!out)return E_POINTER;*out=nullptr;if(!window)return E_FAIL;HWND child=::GetWindow(window,GW_CHILD);GUITHREADINFO info{};info.cbSize=sizeof(info);if(!GetGUIThreadInfo(GetWindowThreadProcessId(child?child:window,nullptr),&info))return error();*out=info.hwndFocus;return *out?S_OK:S_FALSE;}
- HRESULT STDMETHODCALLTYPE TranslateAccelerator(MSG*msg)override{IPreviewHandlerFrame*frame=nullptr;HRESULT hr=S_FALSE;HRESULT q=site?site->QueryInterface(IID_PPV_ARGS(&frame)):E_NOINTERFACE;log(dir,L"frame-query",q);if(SUCCEEDED(q)){hr=frame->TranslateAccelerator(msg);frame->Release();}log(dir,L"frame-translate",hr);return hr;}
- HRESULT STDMETHODCALLTYPE SetSite(IUnknown*s)override{log(dir,L"set-site",s?1:0);if(s)s->AddRef();if(site)site->Release();site=s;return S_OK;}
+ HRESULT STDMETHODCALLTYPE SetFocus()override{if(!window)return E_FAIL;HWND child=::GetWindow(window,GW_CHILD);::SetFocus(child?child:window);return S_OK;}
+ HRESULT STDMETHODCALLTYPE QueryFocus(HWND*out)override{if(!out)return E_POINTER;*out=nullptr;if(!window)return E_FAIL;HWND child=::GetWindow(window,GW_CHILD);GUITHREADINFO info{};info.cbSize=sizeof(info);if(!GetGUIThreadInfo(GetWindowThreadProcessId(child?child:window,nullptr),&info))return error();*out=info.hwndFocus;return *out?S_OK:S_FALSE;}
+ HRESULT STDMETHODCALLTYPE TranslateAccelerator(MSG*msg)override{IPreviewHandlerFrame*frame=nullptr;HRESULT hr=S_FALSE;if(site&&SUCCEEDED(site->QueryInterface(IID_PPV_ARGS(&frame)))){hr=frame->TranslateAccelerator(msg);frame->Release();}return hr;}
+ HRESULT STDMETHODCALLTYPE SetSite(IUnknown*s)override{if(s)s->AddRef();if(site)site->Release();site=s;return S_OK;}
  HRESULT STDMETHODCALLTYPE GetSite(REFIID iid,void**out)override{if(!out)return E_POINTER;*out=nullptr;return site?site->QueryInterface(iid,out):E_FAIL;}
  HRESULT STDMETHODCALLTYPE GetWindow(HWND*out)override{if(!out)return E_POINTER;*out=window;return S_OK;}
  HRESULT STDMETHODCALLTYPE ContextSensitiveHelp(BOOL)override{return E_NOTIMPL;}

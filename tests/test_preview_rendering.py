@@ -99,3 +99,32 @@ def native_gpu_test(request):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     return False
+
+
+def tall_box(height_axis):
+    """Boîte 1 × 1 × 3 dont la grande dimension suit l'axe demandé."""
+    size = [1., 1., 1.]
+    size[height_axis] = 3.
+    corners = np.array([[x, y, z] for x in (0, size[0]) for y in (0, size[1]) for z in (0, size[2])], dtype=np.float32)
+    faces = np.array([[0,1,3],[0,3,2],[4,6,7],[4,7,5],[0,4,5],[0,5,1],[2,3,7],[2,7,6],[0,2,6],[0,6,4],[1,5,7],[1,7,3]], dtype=np.uint32)
+    return corners, faces
+
+
+def silhouette(image):
+    background = image.pixel(0, 0)
+    cells = [(x, y) for x in range(image.width()) for y in range(image.height()) if image.pixel(x, y) != background]
+    xs, ys = [c[0] for c in cells], [c[1] for c in cells]
+    return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
+def test_z_up_stands_a_printing_model_upright(request):
+    if not native_gpu_test(request):
+        return
+    r = renderer()
+    points, faces = tall_box(2)
+    with r.MeshRenderer(r.prepare_arrays(points, faces)) as gpu:
+        width, height = silhouette(gpu.render(128, 128, yaw=0, pitch=0, up='z'))
+        assert height > 2 * width
+        width, height = silhouette(gpu.render(128, 128, yaw=0, pitch=0, up='y'))
+        assert abs(height - width) <= 2
+        with pytest.raises(ValueError): gpu.render(64, 64, up='x')

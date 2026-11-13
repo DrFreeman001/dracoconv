@@ -128,7 +128,10 @@ class MeshRenderer:
         finally:
             self.context.doneCurrent()
 
-    def render(self, width, height, yaw=30., pitch=-20., zoom=1.):
+    def render(self, width, height, yaw=30., pitch=-20., zoom=1., up='y'):
+        """up='z' tient debout un modèle d'impression 3D (Z vertical, comme dans les trancheurs)."""
+        if up not in ('y', 'z'):
+            raise ValueError('Vertical axis must be y or z')
         if not (1 <= width <= 2048 and 1 <= height <= 2048):
             raise ValueError('Framebuffer dimensions must be between 1 and 2048')
         if not np.isfinite([yaw, pitch, zoom]).all():
@@ -156,6 +159,8 @@ class MeshRenderer:
             rotation = QMatrix4x4()
             rotation.rotate(float(pitch), 1, 0, 0)
             rotation.rotate(float(yaw), 0, 1, 0)
+            if up == 'z':
+                rotation.rotate(-90., 1, 0, 0)
             projection = QMatrix4x4()
             zoom = float(np.clip(zoom, .2, 5.))
             extent = .5 / (.72 * zoom)

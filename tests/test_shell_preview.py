@@ -28,3 +28,46 @@ def test_thumbnail_has_geometry(qapp, tmp_path):
     assert image.width() == image.height() == 128
     assert image.save(str(tmp_path / 'thumb.png'))
     assert len({image.pixel(x,y) for x in range(128) for y in range(128)}) > 2
+
+
+def test_thumbnail_uses_every_face_when_opengl_works(monkeypatch):
+    from dracoconv import shell_preview
+    calls = {}
+
+    class FakeRenderer:
+        def __init__(self, mesh):
+            calls['faces'] = len(mesh.faces)
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            calls['closed'] = True
+        def render(self, width, height, up='y', **_):
+            calls['render'] = (width, height, up)
+            return 'image'
+
+    monkeypatch.setattr(shell_preview.gpu_rendering, 'MeshRenderer', FakeRenderer)
+    image, simplified = shell_preview.render_thumbnail(encoded(), 5000)
+    assert image == 'image' and not simplified
+    assert calls == {'faces': 2, 'render': (1024, 1024, 'z'), 'closed': True}
+
+
+def test_thumbnail_falls_back_to_sampled_drawing_without_opengl(qapp, monkeypatch):
+    from dracoconv import shell_preview
+
+    def unavailable(mesh):
+        raise RuntimeError('OpenGL context unavailable')
+
+    monkeypatch.setattr(shell_preview.gpu_rendering, 'MeshRenderer', unavailable)
+    image, simplified = shell_preview.render_thumbnail(encoded(), 64)
+    assert image.width() == 64 and not simplified
+
+
+def test_invalid_input_is_not_hidden_by_the_fallback():
+    from dracoconv import shell_preview
+    with pytest.raises(ValueError):
+        shell_preview.render_thumbnail(b'invalid', 64)
+
+
+def test_preview_limit_matches_renderer_limit():
+    from dracoconv import preview_rendering, shell_preview
+    assert shell_preview.MAX_INPUT == preview_rendering.MAX_INPUT == 64 * 1024 * 1024

@@ -1,4 +1,4 @@
-"""Isolated software-only Shell preview helper (feasibility prototype)."""
+"""Isolated Shell preview helper: full OpenGL rendering, sampled drawing as a fallback."""
 from __future__ import annotations
 import argparse
 import ctypes
@@ -9,13 +9,20 @@ import threading
 import numpy as np
 import DracoPy
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QImage, QPainter, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget
+from dracoconv import preview_rendering as gpu_rendering
 
-MAX_INPUT = 32 * 1024 * 1024
+MAX_INPUT = gpu_rendering.MAX_INPUT
+# Les modèles d'impression 3D ont Z vertical, comme dans les trancheurs.
+UP_AXIS = 'z'
+SIMPLIFIED = 'Affichage simplifié · '
+# Vue de trois quarts, légèrement par-dessus (lacet, tangage, zoom).
+DEFAULT_VIEW = (30., 20., 1.)
 
 
-def prepare_mesh(data: bytes, face_limit: int = 12000):
+def prepare_mesh(data: bytes, face_limit: int = 12000, up: str = UP_AXIS):
+    """Échantillon de faces pour le dessin de secours, quand OpenGL manque."""
     if not data or len(data) > MAX_INPUT:
         raise ValueError('Input exceeds preview limit or is empty')
     try:
@@ -34,7 +41,11 @@ def prepare_mesh(data: bytes, face_limit: int = 12000):
         raise ValueError('Empty geometry bounds')
     reduced = len(faces) > face_limit
     faces = faces[::max(1, math.ceil(len(faces) / face_limit))]
-    return ((points[faces] - (low + high) / 2) / scale), reduced
+    triangles = (points[faces] - (low + high) / 2) / scale
+    if up == 'z':
+        # Rotation de -90° autour de X : Z devient la verticale de l'écran.
+        triangles = np.stack([triangles[..., 0], triangles[..., 2], -triangles[..., 1]], axis=-1)
+    return triangles, reduced
 
 
 def project(triangles, yaw=30., pitch=-20., zoom=1.):
@@ -60,9 +71,26 @@ def paint_mesh(painter, triangles, width, height, yaw=30., pitch=-20., zoom=1.):
 def render_image(triangles, size):
     image = QImage(size, size, QImage.Format.Format_ARGB32)
     painter = QPainter(image)
-    paint_mesh(painter, triangles, size, size)
+    paint_mesh(painter, triangles, size, size, *DEFAULT_VIEW)
     painter.end()
     return image
+
+
+def render_thumbnail(data: bytes, size: int):
+    """Miniature de toutes les faces ; dessin échantillonné seulement si OpenGL manque.
+
+    Renvoie (image, simplifiée). Un fichier invalide lève ValueError, sans repli.
+    """
+    size = max(16, min(size, 1024))
+    mesh = gpu_rendering.decode_mesh(data)
+    try:
+        with gpu_rendering.MeshRenderer(mesh) as renderer:
+            yaw, pitch, zoom = DEFAULT_VIEW
+            return renderer.render(size, size, yaw=yaw, pitch=pitch, zoom=zoom, up=UP_AXIS), False
+    except RuntimeError:
+        del mesh
+        triangles, reduced = prepare_mesh(data)
+        return render_image(triangles, size), reduced
 
 
 class Preview(QWidget):
@@ -71,8 +99,9 @@ class Preview(QWidget):
     def __init__(self, source, parent_hwnd):
         super().__init__()
         self.triangles = None
+        self.renderer = None
         self.message = 'Chargement…'
-        self.yaw, self.pitch, self.zoom = 30., -20., 1.
+        self.yaw, self.pitch, self.zoom = DEFAULT_VIEW
         self.drag = None
         self.parent_hwnd = parent_hwnd
         self.source = source
@@ -99,15 +128,28 @@ class Preview(QWidget):
 
     def load(self, source):
         try:
-            tris, reduced = prepare_mesh(Path(source).read_bytes())
-            self.loaded.emit(tris, 'Affichage simplifié · ' if reduced else '')
+            self.loaded.emit(gpu_rendering.decode_mesh(Path(source).read_bytes()), '')
         except Exception as exc:
             self.loaded.emit(None, str(exc))
 
-    def ready(self, triangles, message):
-        self.triangles, self.message = triangles, message
+    def ready(self, mesh, message):
+        # Le contexte OpenGL se crée ici, sur le fil de l'interface.
+        if mesh is not None:
+            try:
+                self.renderer = gpu_rendering.MeshRenderer(mesh)
+                QApplication.instance().aboutToQuit.connect(self.renderer.close)
+            except RuntimeError:
+                try:
+                    self.triangles, reduced = prepare_mesh(Path(self.source).read_bytes())
+                    message = SIMPLIFIED if reduced else ''
+                except Exception as exc:
+                    message = str(exc)
+        self.message = message
         Path(self.source).with_name("ready").touch()
         self.update()
+
+    def has_model(self):
+        return self.renderer is not None or self.triangles is not None
 
     def sync_parent(self):
         from ctypes import wintypes
@@ -126,18 +168,23 @@ class Preview(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        if self.triangles is not None:
+        if self.renderer is not None:
+            ratio = self.devicePixelRatioF()
+            width = max(1, min(2048, round(self.width() * ratio)))
+            height = max(1, min(2048, round(self.height() * ratio)))
+            try:
+                image = self.renderer.render(width, height, self.yaw, self.pitch, self.zoom, up=UP_AXIS)
+                image.setDevicePixelRatio(ratio)
+                painter.drawImage(self.rect(), image)
+            except RuntimeError as exc:
+                painter.fillRect(self.rect(), QColor('#eef1f5'))
+                self.message = str(exc)
+        elif self.triangles is not None:
             paint_mesh(painter,self.triangles,self.width(),self.height(),self.yaw,self.pitch,self.zoom)
         else:
             painter.fillRect(self.rect(), QColor('#eef1f5'))
         painter.setPen(QColor('#26384c'))
-        painter.drawText(self.rect().adjusted(10,10,-10,-10), Qt.AlignmentFlag.AlignBottom | Qt.TextFlag.TextWordWrap, self.message + ('Glisser : rotation · Molette : zoom · R : réinitialiser' if self.triangles is not None else ''))
-        if self.hasFocus():
-            # Cadre de focus visible : sans lui, rien ne montre que le clavier agit sur l'aperçu.
-            pen = QPen(QColor('#0067c0'), 2)
-            painter.setPen(pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(self.rect().adjusted(1, 1, -2, -2))
+        painter.drawText(self.rect().adjusted(10,10,-10,-10), Qt.AlignmentFlag.AlignBottom | Qt.TextFlag.TextWordWrap, self.message + ('Glisser : rotation · Molette : zoom · R : réinitialiser' if self.has_model() else ''))
 
     def mousePressEvent(self, event):
         self.drag = event.position()
@@ -158,39 +205,15 @@ class Preview(QWidget):
         self.zoom = float(np.clip(self.zoom * 1.15 ** (event.angleDelta().y()/120), .2, 5))
         self.update()
 
-    def trace(self, event):
-        import time
-        stamp = time.strftime("%H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}"
-        with (Path(self.source).parent.parent / "trace.log").open("a", encoding="utf-8") as output:
-            output.write(f"{stamp} qt {event}\n")
-
-    def focusInEvent(self, event):
-        self.trace("focus-in")
-        super().focusInEvent(event)
-
-    def focusOutEvent(self, event):
-        self.trace("focus-out")
-        super().focusOutEvent(event)
-
     def focusNextPrevChild(self, forward):
-        self.trace(f"tab forward={forward}")
         user32 = ctypes.WinDLL("user32", use_last_error=True)
-        user32.SendMessageTimeoutW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_size_t)]
-        user32.SendMessageTimeoutW.restype = ctypes.c_ssize_t
-        result = ctypes.c_size_t()
-        user32.SendMessageTimeoutW(self.parent_hwnd, 0x8001, int(forward), 0, 2, 1000, ctypes.byref(result))
+        user32.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+        user32.PostMessageW(self.parent_hwnd, 0x8001, 0x09, 0)
         return True
-
-    def event(self, event):
-        from PySide6.QtCore import QEvent
-        if event.type() == QEvent.Type.KeyPress:
-            self.trace(f"key {event.key():#x} mods={int(event.modifiers().value):#x}")
-        return super().event(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_R:
-            self.trace("reset")
-            self.yaw, self.pitch, self.zoom = 30., -20., 1.
+            self.yaw, self.pitch, self.zoom = DEFAULT_VIEW
             self.update()
         else:
             super().keyPressEvent(event)
@@ -205,8 +228,8 @@ def main():
     args = parser.parse_args()
     app = QApplication([])
     if args.output:
-        triangles, _ = prepare_mesh(Path(args.input).read_bytes())
-        return 0 if render_image(triangles, max(16,min(args.size,1024))).save(args.output) else 2
+        image, _ = render_thumbnail(Path(args.input).read_bytes(), args.size)
+        return 0 if image.save(args.output) else 2
     widget = Preview(args.input, args.parent)
     return app.exec()
 

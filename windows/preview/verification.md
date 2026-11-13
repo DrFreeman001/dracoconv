@@ -21,3 +21,14 @@ La suite complète du dépôt exécutée par l’agent principal a terminé avec
 
 ## Limites du prototype
 Entrée comprimée plafonnée à32MiB ; le Bouddha validé de43,55MB est donc exclu. Budget du job complet1536MiB ;768MiB provoquait un arrêt0xc0000409 pendant le démarrage Python/Qt. Un seul aperçu et une seule miniature à la fois (deux jobs au maximum). Au-delà de12000 triangles, échantillonnage de faces pour affichage uniquement, annoncé « Affichage simplifié » ; ce n’est pas une décimation et peut rendre un modèle poreux. Géométrie seulement, sans textures ni couleurs ; nuages de points refusés. Aucun grand modèle fourni n’a été validé ici. Pas de modification des sources ni de changement de programme par défaut.
+
+## 13 novembre 2026 — clavier abandonné, rendu complet intégré
+
+**Clavier (décision de l'utilisateur : non bloquant, on s'arrête là).** Essai manuel dans le vrai Explorer, sur un `.drc` réel lu seulement. R réinitialise la vue après un clic dans le modèle. Tab et Maj+Tab ne fonctionnent dans aucun sens :
+- entrée : Explorer s'arrête sur sa propre fenêtre « Shell Preview Extension Host » puis appelle `IPreviewHandler::SetFocus` ; `SetFocus` vers la fenêtre Qt échoue avec l'erreur 5 (accès refusé) ;
+- sortie : la fenêtre Qt reçoit R mais jamais Tab, donc `focusNextPrevChild` n'est jamais appelé.
+Le code de diagnostic a été retiré ; le pont et l'auxiliaire sont revenus à leur version du 12 novembre pour cette partie. Limite connue : l'aperçu se manipule à la souris, et R après un clic.
+
+**Piège : ne jamais arrêter `prevhost.exe` de force.** Explorer garde alors la fenêtre hôte du processus mort et la repasse à chaque `SetWindow` (`IsWindow` = 0, rectangle 0 × 0, `CreateWindowEx` en erreur 1400). L'aperçu reste vide dans ce processus Explorer jusqu'à son redémarrage. Constaté deux fois, dans deux processus Explorer distincts. Pour recharger la DLL après recompilation : renommer la DLL chargée, recompiler, puis redémarrer Explorer.
+
+**Rendu complet.** L'auxiliaire dessine toutes les faces par OpenGL (`dracoconv/preview_rendering.py`), pour l'aperçu comme pour la miniature. Le dessin échantillonné ne sert plus que de secours quand OpenGL manque, et l'affiche (« Affichage simplifié »). Vue Z en haut, comme les trancheurs, légèrement par-dessus. Limite d'entrée portée à 64 Mio dans le pont et l'auxiliaire. Miniatures 512 px produites par l'auxiliaire, en processus normal, pour Genius (334 858 faces) et le Bouddha (2 909 880 faces, 43,5 Mo) : surfaces pleines, sources inchangées (SHA-256). Le Bouddha, orienté Y en haut dans son fichier, apparaît couché, comme dans OrcaSlicer.
