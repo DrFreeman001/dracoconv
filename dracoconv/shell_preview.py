@@ -9,7 +9,7 @@ import threading
 import numpy as np
 import DracoPy
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPolygonF
+from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget
 
 MAX_INPUT = 32 * 1024 * 1024
@@ -132,6 +132,12 @@ class Preview(QWidget):
             painter.fillRect(self.rect(), QColor('#eef1f5'))
         painter.setPen(QColor('#26384c'))
         painter.drawText(self.rect().adjusted(10,10,-10,-10), Qt.AlignmentFlag.AlignBottom | Qt.TextFlag.TextWordWrap, self.message + ('Glisser : rotation · Molette : zoom · R : réinitialiser' if self.triangles is not None else ''))
+        if self.hasFocus():
+            # Cadre de focus visible : sans lui, rien ne montre que le clavier agit sur l'aperçu.
+            pen = QPen(QColor('#0067c0'), 2)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(self.rect().adjusted(1, 1, -2, -2))
 
     def mousePressEvent(self, event):
         self.drag = event.position()
@@ -153,8 +159,10 @@ class Preview(QWidget):
         self.update()
 
     def trace(self, event):
-        with Path(self.source).with_name("events.log").open("a", encoding="utf-8") as output:
-            output.write(f"qt {event}\n")
+        import time
+        stamp = time.strftime("%H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}"
+        with (Path(self.source).parent.parent / "trace.log").open("a", encoding="utf-8") as output:
+            output.write(f"{stamp} qt {event}\n")
 
     def focusInEvent(self, event):
         self.trace("focus-in")
@@ -172,6 +180,12 @@ class Preview(QWidget):
         result = ctypes.c_size_t()
         user32.SendMessageTimeoutW(self.parent_hwnd, 0x8001, int(forward), 0, 2, 1000, ctypes.byref(result))
         return True
+
+    def event(self, event):
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.KeyPress:
+            self.trace(f"key {event.key():#x} mods={int(event.modifiers().value):#x}")
+        return super().event(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_R:
