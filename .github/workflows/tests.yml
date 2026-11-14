@@ -20,6 +20,10 @@ jobs:
         shell: python
         run: |
           import xml.etree.ElementTree as ET
+          failed = [c.get('classname') + '.' + c.get('name') for c in ET.parse('report.xml').iter('testcase')
+                    if c.find('failure') is not None or c.find('error') is not None]
+          # GitHub ne garde que dix annotations par étape : la liste complète tient dans la première.
+          print('::error title=' + str(len(failed)) + ' tests en échec::' + '%0A'.join(failed))
           for case in ET.parse("report.xml").iter("testcase"):
               for kind in ("failure", "error"):
                   for problem in case.findall(kind):
