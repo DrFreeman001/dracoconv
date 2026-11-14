@@ -11,6 +11,8 @@ from dracoconv.io import load_mesh
 from dracoconv.quality import error_bound_mm, measure
 from dracoconv.settings import EncodeSettings
 
+needs_reference = pytest.mark.skipif(find_binaries() is None, reason="moteur de référence absent : lancer tools/build_draco.ps1")
+
 
 @pytest.fixture(scope="module")
 def ref():
@@ -104,16 +106,19 @@ def test_select_default_is_builtin():
 @pytest.mark.parametrize(
     "change", [dict(preserve_polygons=True), dict(metadata=True), dict(generic_bits=12), dict(position_bits=30)]
 )
+@needs_reference
 def test_select_falls_back_to_reference(change):
     assert select_engine(replace(EncodeSettings(), **change)).name == "reference"
 
 
+@needs_reference
 def test_select_resolves_tolerance_with_extent():
     tight = replace(EncodeSettings(), tolerance_mm=1e-6)
     assert select_engine(tight, max_extent=1000.0).name == "reference"  # 30 bits nécessaires
     assert select_engine(replace(EncodeSettings(), tolerance_mm=0.01), max_extent=100.0).name == "dracopy"
 
 
+@needs_reference
 def test_select_honours_preference():
     assert select_engine(replace(EncodeSettings(), position_bits=14), prefer="reference").name == "reference"
     assert select_engine(EncodeSettings(), prefer="dracopy").name == "dracopy"

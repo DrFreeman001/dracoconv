@@ -9,6 +9,7 @@ from conftest import (
 )
 from dracoconv import convert
 from dracoconv.convert import decode_file, encode_bytes, encode_file, output_path, verify
+from dracoconv.engine.cli import find_binaries
 from dracoconv.engine.dracopy import DracoPyEngine
 from dracoconv.io import load_mesh, read_stl
 from dracoconv.mesh import Mesh
@@ -131,6 +132,7 @@ def test_3mf_flagged_lossy(tmp_path, cube):
     assert r.state == "done" and r.lossy_source is True
 
 
+@pytest.mark.skipif(find_binaries() is None, reason="moteur de référence absent : lancer tools/build_draco.ps1")
 def test_preserve_polygons_uses_source_file(tmp_path):
     src = make_quad_cube_obj(tmp_path)
     r = encode_file(src, tmp_path / "q.drc", replace(EncodeSettings(), preserve_polygons=True), skip_if_no_gain=False)
