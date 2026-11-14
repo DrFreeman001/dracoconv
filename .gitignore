@@ -1,5 +1,4 @@
 .venv/
-third_party/
 dracoconv/bin/
 __pycache__/
 *.part

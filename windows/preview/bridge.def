@@ -1,4 +1,0 @@
-LIBRARY DracoPreview
-EXPORTS
-DllGetClassObject PRIVATE
-DllCanUnloadNow PRIVATE

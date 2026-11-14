@@ -84,6 +84,10 @@ The language is changed from the menu, without restarting. The **Appearance** me
 
 An animated bar shows activity during scanning, estimation, and conversion. The conversion counter displays completed files and the batch percentage; it does not claim to measure the encoder’s internal progress within one file.
 
+## Seeing `.drc` files in Windows Explorer
+
+Thumbnails and 3D preview of `.drc` (and STEP) files in Explorer: separate project [explorer-draco-step-preview](https://github.com/DrFreeman001/explorer-draco-step-preview).
+
 ## The command line
 
 List the 3D files of a folder, changing nothing:

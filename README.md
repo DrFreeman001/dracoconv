@@ -84,6 +84,10 @@ La langue se change dans le menu, sans redémarrer. Le menu **Apparence** permet
 
 Une barre animée indique le travail pendant l’analyse, l’estimation et la conversion. Le compteur de conversion affiche les fichiers terminés et le pourcentage du lot ; il ne prétend pas mesurer la progression interne de l’encodeur sur un fichier.
 
+## Voir les `.drc` dans l'Explorateur Windows
+
+Miniatures et aperçu 3D des fichiers `.drc` (et STEP) dans l'Explorateur : projet séparé [explorer-draco-step-preview](https://github.com/DrFreeman001/explorer-draco-step-preview).
+
 ## La ligne de commande
 
 Recenser les fichiers 3D d'un dossier, sans rien modifier :

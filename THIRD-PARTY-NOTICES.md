@@ -18,8 +18,3 @@ dracoconv est sous licence Apache-2.0 (voir `LICENSE`). Ce dépôt ne contient a
 ## Outils de référence Draco (compilés par `tools/build_draco.ps1`)
 
 Google Draco, Apache-2.0. https://github.com/google/draco
-
-## Lecteur STEP de l'extension Explorateur (téléchargé par `windows/preview/fetch_occt.py`)
-
-- Open CASCADE Technology 8.0.1 : LGPL-2.1 avec l'exception Open CASCADE. https://dev.opencascade.org
-- DLL dont OpenCascade dépend, paquets conda-forge : FreeImage, FreeType, Imath, libjpeg-turbo, libpng, LibRaw, libtiff, libwebp, zlib, OpenEXR, OpenJPEG, LERC, libdeflate, Zstandard, liblzma, Little CMS, OpenJPH. Chacune garde sa propre licence, fournie dans son paquet conda-forge ; elles n'ont pas été relevées une à une ici.
