@@ -99,3 +99,5 @@ Essai avec un `step_mesh.exe` instrumenté (retiré ensuite), sources lues seule
 - `probe.exe` : miniature et déchargement réussis. `cache_probe.exe` sur une copie neuve de `tests/data/colored_block.step` : miniature fournie par le cache de Windows (HRESULT 0), donc par la nouvelle DLL.
 - Suite complète réussie.
 - **Non vérifié :** un fichier STEP assez gros pour dépasser l'ancien délai (aucun dans la collection) ; le volet d'aperçu à l'œil après ce changement ; `test_failure.py` (à ne pas lancer tant que l'extension est installée). La limite mémoire de 1 536 Mio n'a pas bougé et peut devenir la première atteinte.
+
+**Contrôle à l'écran, même jour.** Carte BTT EBB42 (29 Mo) sélectionnée dans le vrai Explorer, volet d'aperçu ouvert : modèle complet et en couleurs (carte noire, bornier vert, entretoises jaunes, connecteurs blancs) avec la nouvelle DLL. Rotation à la souris non rejouée.
