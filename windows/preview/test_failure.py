@@ -10,7 +10,7 @@ try:
         result=subprocess.run([str(root/'windows/preview/build/preview_probe.exe'),'4000'],capture_output=True,text=True,timeout=15)
         print(result.stdout);assert result.returncode==0, 'Helper failure remained at Loading'
         script.write_text('import time; time.sleep(60)\n')
-        result=subprocess.run([str(root/'windows/preview/build/preview_probe.exe'),'22000'],capture_output=True,text=True,timeout=28)
+        result=subprocess.run([str(root/'windows/preview/build/preview_probe.exe'),'47000'],capture_output=True,text=True,timeout=53)
         print(result.stdout);assert result.returncode==0, 'Startup timeout remained at Loading'
 finally:
     ini.write_bytes(previous)

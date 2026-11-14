@@ -39,7 +39,7 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
  void monitor(){
   if(!process)return;
   if(GetFileAttributesW((dir+L"\\ready").c_str())!=INVALID_FILE_ATTRIBUTES)ready=true;
-  if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>20000)){
+  if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>45000)){
    stopHelper();SetWindowTextW(window,L"Apercu indisponible : chargement interrompu ou limite atteinte.");
   }
  }
@@ -86,7 +86,7 @@ public:
  if(!out||!alpha)return E_POINTER;*out=nullptr;*alpha=WTSAT_UNKNOWN;if(input.empty())return E_UNEXPECTED;
  HANDLE mutex=CreateMutexW(nullptr,FALSE,L"Local\\DracoConvThumbnail-47E7A10B");if(!mutex)return error();DWORD wait=WaitForSingleObject(mutex,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED){CloseHandle(mutex);return HRESULT_FROM_WIN32(ERROR_BUSY);}
  std::wstring output=dir+L"\\thumb.png";HRESULT hr=launch(L"--output "+quote(output)+L" --size "+std::to_wstring(cx));
- if(SUCCEEDED(hr)){if(WaitForSingleObject(process,20000)!=WAIT_OBJECT_0)hr=HRESULT_FROM_WIN32(ERROR_TIMEOUT);else{DWORD code;GetExitCodeProcess(process,&code);if(code){printf("Helper exit %lu\n",code);hr=E_FAIL;}}}
+ if(SUCCEEDED(hr)){if(WaitForSingleObject(process,45000)!=WAIT_OBJECT_0)hr=HRESULT_FROM_WIN32(ERROR_TIMEOUT);else{DWORD code;GetExitCodeProcess(process,&code);if(code){printf("Helper exit %lu\n",code);hr=E_FAIL;}}}
  if(SUCCEEDED(hr)){
  IWICImagingFactory*factory=nullptr;IWICBitmapDecoder*decoder=nullptr;IWICBitmapFrameDecode*frame=nullptr;IWICFormatConverter*converter=nullptr;
  hr=CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&factory));

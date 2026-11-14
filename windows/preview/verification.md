@@ -91,3 +91,11 @@ Essai avec un `step_mesh.exe` instrumenté (retiré ensuite), sources lues seule
 - Un maillage dix fois plus grossier ne gagne aucun temps : la conversion domine et ne dépend pas de la finesse. Idée abandonnée.
 - Couper la réparation des formes d'OpenCascade (`SetShapeProcessFlags` vide) ne change rien non plus : 6,1 s et 3,5 s, mêmes triangles.
 - Le seul levier restant est le délai : 16 s côté Python, 20 s dans `bridge.cpp`. Un fichier deux fois plus gros que The 100 demanderait environ 18 s de lecteur et dépasserait. Non modifié : il faut recompiler la DLL et redémarrer Explorer. Aucun fichier de la collection ne dépasse 33 Mo.
+
+## 14 novembre 2026 — délai porté à 45 s
+
+À la demande de l'utilisateur : 45 s dans `bridge.cpp` (miniature et chargement initial de l'aperçu), 40 s pour `step_mesh.exe`. DLL recompilée Explorer arrêté, puis Explorer relancé.
+
+- `probe.exe` : miniature et déchargement réussis. `cache_probe.exe` sur une copie neuve de `tests/data/colored_block.step` : miniature fournie par le cache de Windows (HRESULT 0), donc par la nouvelle DLL.
+- Suite complète réussie.
+- **Non vérifié :** un fichier STEP assez gros pour dépasser l'ancien délai (aucun dans la collection) ; le volet d'aperçu à l'œil après ce changement ; `test_failure.py` (à ne pas lancer tant que l'extension est installée). La limite mémoire de 1 536 Mio n'a pas bougé et peut devenir la première atteinte.
