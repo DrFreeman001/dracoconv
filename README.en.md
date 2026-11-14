@@ -4,6 +4,8 @@
 
 A Draco (`.drc`) converter for 3D models, both ways, on a file, a folder or a whole drive. Before converting, it tells you how much space you can expect to save and how much quality the chosen settings cost.
 
+!["Gain and quality" step: projected space saving and deviation by number of bits](docs/images/projection.jpg)
+
 Built to archive a collection of 3D-printing models: the `.drc` files open in OrcaSlicer, and convert back to STL for software that does not read Draco yet.
 
 - **To `.drc`** from STL (ASCII and binary), OBJ, PLY, 3MF (geometry only), and those formats inside ZIP archives.

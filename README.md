@@ -4,6 +4,8 @@
 
 Convertisseur Draco (`.drc`) pour modèles 3D, dans les deux sens, sur un fichier, un dossier ou un disque entier. Avant de convertir, il annonce le gain de place attendu et la perte de qualité selon les réglages.
 
+![Étape « Gain et qualité » : gain de place projeté et écart selon le nombre de bits](docs/images/projection.jpg)
+
 Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'ouvrent dans OrcaSlicer, et se reconvertissent en STL pour les logiciels qui ne lisent pas encore Draco.
 
 - **Vers `.drc`** depuis STL (texte et binaire), OBJ, PLY, 3MF (géométrie seule) et ces formats à l'intérieur d'archives ZIP.
