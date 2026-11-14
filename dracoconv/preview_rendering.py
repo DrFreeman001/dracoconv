@@ -7,12 +7,13 @@ from dataclasses import dataclass
 import numpy as np
 import DracoPy
 from shiboken6 import VoidPtr
-from PySide6.QtGui import QOffscreenSurface, QOpenGLContext, QSurfaceFormat, QMatrix4x4
+from PySide6.QtGui import QOffscreenSurface, QOpenGLContext, QSurfaceFormat, QMatrix4x4, QVector3D
 from PySide6.QtOpenGL import QOpenGLBuffer, QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLFramebufferObjectFormat
 
 MAX_INPUT = 64 * 1024 * 1024
 MAX_VERTICES = 20_000_000
 MAX_FACES = 30_000_000
+DEFAULT_COLOR = (65 / 255, 135 / 255, 205 / 255)
 
 
 @dataclass
@@ -20,6 +21,7 @@ class DisplayMesh:
     positions: np.ndarray
     faces: np.ndarray
     simplified: bool = False
+    colors: np.ndarray | None = None  # uint8 (sommets, 3), sRGB ; None : couleur par défaut
 
 
 def prepare_arrays(points, faces):
@@ -59,21 +61,25 @@ def decode_mesh(data):
 
 _VERTEX = '''#version 120
 attribute vec3 position;
+attribute vec3 color;
+varying vec3 surfaceColor;
 uniform mat4 rotation;
 uniform mat4 projection;
 varying vec3 surfacePosition;
 void main() {
     vec4 p = rotation * vec4(position, 1.0);
     surfacePosition = p.xyz;
+    surfaceColor = color;
     gl_Position = projection * p;
 }
 '''
 _FRAGMENT = '''#version 120
 varying vec3 surfacePosition;
+varying vec3 surfaceColor;
 void main() {
     vec3 n = normalize(cross(dFdx(surfacePosition), dFdy(surfacePosition)));
     float light = 0.35 + 0.65 * abs(dot(n, normalize(vec3(-0.35,0.5,1.0))));
-    gl_FragColor = vec4(vec3(0.255,0.53,0.805)*light, 1.0);
+    gl_FragColor = vec4(surfaceColor*light, 1.0);
 }
 '''
 
@@ -110,9 +116,17 @@ class MeshRenderer:
                 if not self.program.addShaderFromSourceCode(stage, code):
                     raise RuntimeError('OpenGL shader unavailable: ' + self.program.log())
             self.program.bindAttributeLocation('position', 0)
+            self.program.bindAttributeLocation('color', 1)
             if not self.program.link():
                 raise RuntimeError('OpenGL program unavailable: ' + self.program.log())
-            for kind, array in [(QOpenGLBuffer.Type.VertexBuffer, mesh.positions), (QOpenGLBuffer.Type.IndexBuffer, mesh.faces)]:
+            colors = getattr(mesh, 'colors', None)
+            if colors is not None and (colors.dtype != np.uint8 or colors.shape != mesh.positions.shape):
+                raise ValueError('Invalid vertex colors')
+            self.colored = colors is not None
+            arrays = [(QOpenGLBuffer.Type.VertexBuffer, mesh.positions), (QOpenGLBuffer.Type.IndexBuffer, mesh.faces)]
+            if self.colored:
+                arrays.append((QOpenGLBuffer.Type.VertexBuffer, np.ascontiguousarray(colors)))
+            for kind, array in arrays:
                 buffer = QOpenGLBuffer(kind)
                 self.buffers.append(buffer)
                 if not buffer.create() or not buffer.bind():
@@ -155,6 +169,13 @@ class MeshRenderer:
             self.buffers[0].bind()
             self.program.enableAttributeArray(0)
             self.program.setAttributeBuffer(0, 0x1406, 0, 3, 12)
+            if self.colored:
+                self.buffers[2].bind()
+                self.program.enableAttributeArray(1)
+                self.program.setAttributeBuffer(1, 0x1401, 0, 3, 3)  # octets non signés, normalisés par Qt
+            else:
+                self.program.disableAttributeArray(1)
+                self.program.setAttributeValue(1, QVector3D(*DEFAULT_COLOR))
             self.buffers[1].bind()
             rotation = QMatrix4x4()
             rotation.rotate(float(pitch), 1, 0, 0)

@@ -128,3 +128,21 @@ def test_z_up_stands_a_printing_model_upright(request):
         width, height = silhouette(gpu.render(128, 128, yaw=0, pitch=0, up='y'))
         assert abs(height - width) <= 2
         with pytest.raises(ValueError): gpu.render(64, 64, up='x')
+
+
+def test_vertex_colours_reach_the_image(request):
+    if not native_gpu_test(request):
+        return
+    from dracoconv.preview_rendering import DisplayMesh, MeshRenderer
+    points = np.array([[-.5, -.5, 0], [.5, -.5, 0], [.5, .5, 0], [-.5, .5, 0]], np.float32)
+    faces = np.array([[0, 1, 2], [0, 2, 3]], np.uint32)
+    plain = DisplayMesh(points, faces)
+    red = DisplayMesh(points, faces, colors=np.tile(np.array([[255, 0, 0]], np.uint8), (4, 1)))
+    images = []
+    for mesh in (plain, red):
+        with MeshRenderer(mesh) as renderer:
+            images.append(renderer.render(64, 64, yaw=0, pitch=0).pixelColor(32, 32))
+    assert images[0].blue() > images[0].red() + 60
+    assert images[1].red() > 150 and images[1].green() < 20 and images[1].blue() < 20
+    with pytest.raises(ValueError, match='colors'):
+        MeshRenderer(DisplayMesh(points, faces, colors=np.zeros((3, 3), np.uint8)))

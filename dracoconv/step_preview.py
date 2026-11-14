@@ -10,7 +10,7 @@ import numpy as np
 from dracoconv.preview_rendering import MAX_FACES, MAX_VERTICES, DisplayMesh, prepare_arrays
 
 STEP_TOOL = Path(__file__).resolve().parents[1] / 'windows' / 'preview' / 'build' / 'step' / 'step_mesh.exe'
-MAGIC = b'DCMESH1\0'
+MAGIC = b'DCMESH2\0'
 # L'auxiliaire dispose de 20 s en tout ; on garde de quoi démarrer Qt et dessiner.
 TIMEOUT = 16
 _ERRORS = {2: 'Invalid STEP input', 3: 'STEP file has no surfaces', 4: 'STEP model exceeds preview limit',
@@ -28,11 +28,14 @@ def read_mesh_file(path: Path) -> DisplayMesh:
     vertices, faces = (int(n) for n in np.frombuffer(data, '<u4', 2, 8))
     if not 0 < vertices <= MAX_VERTICES or not 0 < faces <= MAX_FACES:
         raise ValueError('Invalid STEP mesh counts')
-    if len(data) != 16 + 12 * vertices + 12 * faces:
+    if len(data) != 16 + 15 * vertices + 12 * faces:
         raise ValueError('Truncated STEP mesh')
     points = np.frombuffer(data, '<f4', vertices * 3, 16).reshape(-1, 3)
     indices = np.frombuffer(data, '<u4', faces * 3, 16 + 12 * vertices).reshape(-1, 3)
-    return prepare_arrays(points, indices)
+    mesh = prepare_arrays(points, indices)
+    # Couleur sRGB de chaque sommet, lue dans le fichier STEP (bleu par défaut pour les faces sans couleur).
+    mesh.colors = np.frombuffer(data, np.uint8, vertices * 3, 16 + 12 * vertices + 12 * faces).reshape(-1, 3).copy()
+    return mesh
 
 
 def mesh_step(source: Path, output: Path, tool: Path = STEP_TOOL, timeout: float = TIMEOUT) -> DisplayMesh:

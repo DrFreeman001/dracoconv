@@ -9,4 +9,4 @@ Première version.
 - Projection du gain de place et mesure de la perte de qualité avant conversion.
 - Vérification de chaque fichier produit ; originaux jamais touchés par défaut.
 - Réglage « Préserver la topologie » pour les modèles non étanches.
-- Prototype d'extension pour l'Explorateur Windows : miniatures et aperçu 3D des `.drc`, `.step` et `.stp` (voir `windows/preview/README.md`).
+- Prototype d'extension pour l'Explorateur Windows : miniatures et aperçu 3D des `.drc`, `.step` et `.stp` (voir `windows/preview/README.md`), avec les couleurs des pièces STEP.

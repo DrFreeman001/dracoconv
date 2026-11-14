@@ -1,6 +1,7 @@
 // Lit un fichier STEP, le découpe en triangles et écrit un maillage compact pour l'aperçu.
 // Usage : step_mesh.exe <entrée.step> <sortie.mesh>
-// Sortie : "DCMESH1\0", uint32 sommets, uint32 triangles, float32[sommets*3], uint32[triangles*3].
+// Sortie : "DCMESH2\0", uint32 sommets, uint32 triangles, float32[sommets*3], uint32[triangles*3],
+//          uint8[sommets*3] couleur sRGB de chaque sommet (celle de sa face dans le fichier, sinon le bleu par défaut).
 // Codes de sortie : 0 réussi, 1 arguments, 2 lecture STEP, 3 aucune surface, 4 limite, 5 écriture, 6 exception.
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -11,7 +12,19 @@
 #include <exception>
 #include <string>
 #include <vector>
-#include <STEPControl_Reader.hxx>
+#include <STEPCAFControl_Reader.hxx>
+#include <TDocStd_Document.hxx>
+#include <NCollection_Sequence.hxx>
+#include <XCAFDoc_DocumentTool.hxx>
+#include <XCAFDoc_ShapeTool.hxx>
+#include <XCAFPrs.hxx>
+#include <XCAFPrs_Style.hxx>
+#include <Quantity_Color.hxx>
+#include <NCollection_DataMap.hxx>
+#include <NCollection_IndexedDataMap.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
+#include <TopoDS_Compound.hxx>
+#include <BRep_Builder.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBndLib.hxx>
@@ -25,6 +38,7 @@
 #include <Standard_Failure.hxx>
 
 static const uint32_t MAX_VERTICES = 20000000, MAX_FACES = 30000000;
+static const uint32_t DEFAULT_COLOR = 65 | 135 << 8 | 205 << 16;  // bleu de l'aperçu, octets R, V, B
 
 static std::string utf8(const wchar_t* text) {
     int n = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
@@ -33,14 +47,16 @@ static std::string utf8(const wchar_t* text) {
     return out;
 }
 
-static int write_mesh(const wchar_t* path, const std::vector<float>& points, const std::vector<uint32_t>& faces) {
+static int write_mesh(const wchar_t* path, const std::vector<float>& points, const std::vector<uint32_t>& faces,
+                      const std::vector<uint8_t>& colors) {
     std::wstring part = std::wstring(path) + L".part";
     FILE* f = nullptr;
     if (_wfopen_s(&f, part.c_str(), L"wb") || !f) return 5;
     uint32_t header[2] = {uint32_t(points.size() / 3), uint32_t(faces.size() / 3)};
-    bool ok = fwrite("DCMESH1", 1, 8, f) == 8 && fwrite(header, 4, 2, f) == 2 &&
+    bool ok = fwrite("DCMESH2", 1, 8, f) == 8 && fwrite(header, 4, 2, f) == 2 &&
               fwrite(points.data(), 4, points.size(), f) == points.size() &&
-              fwrite(faces.data(), 4, faces.size(), f) == faces.size();
+              fwrite(faces.data(), 4, faces.size(), f) == faces.size() &&
+              fwrite(colors.data(), 1, colors.size(), f) == colors.size();
     ok = fclose(f) == 0 && ok;
     if (!ok || !MoveFileExW(part.c_str(), path, MOVEFILE_REPLACE_EXISTING)) {
         DeleteFileW(part.c_str());
@@ -50,13 +66,49 @@ static int write_mesh(const wchar_t* path, const std::vector<float>& points, con
 }
 
 static int run(const wchar_t* input, const wchar_t* output) {
-    TopoDS_Shape shape;
+    TopoDS_Compound shape;
+    NCollection_DataMap<TopoDS_Shape, uint32_t, TopTools_ShapeMapHasher> face_colors;
     {
-        // Le lecteur garde tout le graphe STEP en mémoire : il est libéré avant le maillage.
-        STEPControl_Reader reader;
-        if (reader.ReadFile(utf8(input).c_str()) != IFSelect_RetDone) return 2;
-        if (reader.TransferRoots() <= 0) return 3;
-        shape = reader.OneShape();
+        // Le lecteur garde tout le graphe STEP en mémoire : il est libéré, avec le document, avant le maillage.
+        Handle(TDocStd_Document) document = new TDocStd_Document("BinXCAF");
+        {
+            STEPCAFControl_Reader reader;
+            reader.SetColorMode(true);
+            reader.SetNameMode(false);
+            reader.SetLayerMode(false);
+            reader.SetPropsMode(false);
+            reader.SetMetaMode(false);
+            reader.SetSHUOMode(false);
+            reader.SetGDTMode(false);
+            reader.SetMatMode(false);
+            if (reader.ReadFile(utf8(input).c_str()) != IFSelect_RetDone) return 2;
+            if (!reader.Transfer(document)) return 3;
+        }
+        Handle(XCAFDoc_ShapeTool) tool = XCAFDoc_DocumentTool::ShapeTool(document->Main());
+        NCollection_Sequence<TDF_Label> roots;
+        tool->GetFreeShapes(roots);
+        BRep_Builder builder;
+        builder.MakeCompound(shape);
+        NCollection_IndexedDataMap<TopoDS_Shape, XCAFPrs_Style, TopTools_ShapeMapHasher> styles;
+        for (int i = 1; i <= roots.Length(); ++i) {
+            TopoDS_Shape root = tool->GetShape(roots.Value(i));
+            if (root.IsNull()) continue;
+            builder.Add(shape, root);
+            XCAFPrs::CollectStyleSettings(roots.Value(i), TopLoc_Location(), styles);
+        }
+        // Du plus englobant au plus précis : la couleur d'une face l'emporte sur celle de son solide.
+        for (int kind = TopAbs_COMPOUND; kind <= TopAbs_FACE; ++kind) {
+            for (int i = 1; i <= styles.Extent(); ++i) {
+                const TopoDS_Shape& styled = styles.FindKey(i);
+                const XCAFPrs_Style& style = styles.FindFromIndex(i);
+                if (styled.ShapeType() != kind || !style.IsSetColorSurf()) continue;
+                double r, g, b;
+                style.GetColorSurf().Values(r, g, b, Quantity_TOC_sRGB);
+                auto byte = [](double v) { return uint32_t((std::min)(255.0, (std::max)(0.0, v * 255.0 + 0.5))); };
+                const uint32_t color = byte(r) | byte(g) << 8 | byte(b) << 16;
+                for (TopExp_Explorer it(styled, TopAbs_FACE); it.More(); it.Next()) face_colors.Bind(it.Current(), color);
+            }
+        }
     }
     if (shape.IsNull()) return 3;
     Bnd_Box box;
@@ -70,6 +122,7 @@ static int run(const wchar_t* input, const wchar_t* output) {
     BRepMesh_IncrementalMesh mesher(shape, size * 0.001, false, 0.5, true);
     std::vector<float> points;
     std::vector<uint32_t> faces;
+    std::vector<uint8_t> colors;
     for (TopExp_Explorer it(shape, TopAbs_FACE); it.More(); it.Next()) {
         const TopoDS_Face& face = TopoDS::Face(it.Current());
         TopLoc_Location location;
@@ -85,6 +138,13 @@ static int run(const wchar_t* input, const wchar_t* output) {
             points.push_back(float(p.Y()));
             points.push_back(float(p.Z()));
         }
+        uint32_t color = DEFAULT_COLOR;
+        face_colors.Find(face, color);
+        for (int i = 0; i < nodes; ++i) {
+            colors.push_back(uint8_t(color));
+            colors.push_back(uint8_t(color >> 8));
+            colors.push_back(uint8_t(color >> 16));
+        }
         const bool reversed = face.Orientation() == TopAbs_REVERSED;
         for (int i = 1; i <= triangles; ++i) {
             int a, b, c;
@@ -96,7 +156,7 @@ static int run(const wchar_t* input, const wchar_t* output) {
         }
     }
     if (faces.empty()) return 3;
-    return write_mesh(output, points, faces);
+    return write_mesh(output, points, faces, colors);
 }
 
 int wmain(int argc, wchar_t** argv) {

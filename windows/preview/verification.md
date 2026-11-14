@@ -65,3 +65,14 @@ Collection : 69 fichiers STEP, 122 Mo, le plus gros 33 Mo. Sources lues seulemen
 **Piège : clé `.step` réécrite.** Inscrits d'abord sous `HKCU\Software\Classes\.step\shellex`, les gestionnaires disparaissaient (pour `.step` et `.stp`) dès qu'Explorer affichait un fichier STEP ; la valeur par défaut « Orca.Slicer.1 » restait. Sous `SystemFileAssociations\.step` et `.stp`, ils tiennent. L'auteur de l'effacement n'est pas identifié (pas d'outil de traçage sans élévation).
 
 **Reste ouvert.** Les couleurs de pièces ne sont pas lues. Un STEP proche de 64 Mo pourrait dépasser 16 s ou la limite mémoire : l'aperçu afficherait alors une erreur, sans risque pour le fichier.
+
+## 14 novembre 2026 — couleurs STEP
+
+`step_mesh.exe` lit maintenant les couleurs (STEPCAFControl, styles XCAF : la couleur d'une face l'emporte sur celle de son solide) et les écrit par sommet (format `DCMESH2`). Le rendu OpenGL les dessine.
+
+Mesuré hors Explorer, sources lues seulement (SHA-256 inchangés) :
+- The 100 (33 Mo) : `step_mesh` 8,8 s, 535 Mio réservés au pic (526 avant) ; miniature complète 9,1 s, auxiliaire 848 Mio (828 avant).
+- Carte BTT EBB42 (29 Mo) : 6,0 s, 372 Mio ; miniature 6,3 s.
+- Images contrôlées à l'œil : châssis gris et carte électronique de The 100, carte EBB42 noire avec bornier vert et entretoises dorées, engrenage PETmachine blanc.
+
+**Non refait :** l'essai dans le vrai Explorer en faible intégrité. La DLL n'a pas changé ; l'auxiliaire et `step_mesh.exe` sont relus à chaque aperçu. Les miniatures déjà en cache restent bleues jusqu'à leur renouvellement.

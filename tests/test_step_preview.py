@@ -8,11 +8,12 @@ BLOCK = Path(__file__).parent / 'data' / 'tall_block.step'
 needs_tool = pytest.mark.skipif(not step_preview.STEP_TOOL.exists(), reason='step_mesh.exe not built')
 
 
-def write_mesh(path, points, faces, magic=step_preview.MAGIC, counts=None):
+def write_mesh(path, points, faces, magic=step_preview.MAGIC, counts=None, colors=None):
     points = np.asarray(points, np.float32)
     faces = np.asarray(faces, np.uint32)
     counts = counts or (len(points), len(faces))
-    path.write_bytes(magic + np.asarray(counts, '<u4').tobytes() + points.tobytes() + faces.tobytes())
+    colors = np.full((len(points), 3), 7, np.uint8) if colors is None else np.asarray(colors, np.uint8)
+    path.write_bytes(magic + np.asarray(counts, '<u4').tobytes() + points.tobytes() + faces.tobytes() + colors.tobytes())
 
 
 def test_recognizes_step_header():
@@ -73,3 +74,25 @@ def test_invalid_step_is_rejected(tmp_path):
     with pytest.raises(ValueError, match='STEP'):
         step_preview.mesh_step(source, tmp_path / 'model.mesh')
     assert not (tmp_path / 'model.mesh').exists()
+
+
+def test_reads_vertex_colors(tmp_path):
+    path = tmp_path / 'model.mesh'
+    write_mesh(path, [[0, 0, 0], [2, 0, 0], [0, 4, 0]], [[0, 1, 2]], colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+    mesh = step_preview.read_mesh_file(path)
+    assert mesh.colors.dtype == np.uint8 and mesh.colors.tolist() == [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+
+
+@needs_tool
+def test_uncoloured_step_gets_the_default_colour(tmp_path):
+    mesh = step_preview.mesh_step(BLOCK, tmp_path / 'model.mesh')
+    assert {tuple(c) for c in mesh.colors.tolist()} == {(65, 135, 205)}
+
+
+@needs_tool
+def test_face_colour_overrides_solid_colour(tmp_path):
+    mesh = step_preview.mesh_step(BLOCK.with_name('colored_block.step'), tmp_path / 'model.mesh')
+    colors = {tuple(c) for c in mesh.colors.tolist()}
+    assert colors == {(0, 255, 0), (255, 0, 0)}
+    assert 0 < (mesh.colors[:, 0] == 255).sum() < len(mesh.colors) / 2
+
