@@ -9,7 +9,7 @@
       "stl"
     ],
     "per_class": 5,
-    "note": "STL et OBJ mesurés le 2026-11-12 sur le même échantillon de 40 fichiers par profil (38 encodés, 2 illisibles conservés à leur taille d'origine dans la projection). PLY conservé de la calibration du 2026-11-11 sur deux fichiers ; ZIP et 3MF restent des valeurs de départ non mesurées.",
+    "note": "STL et OBJ mesurés le 2026-11-12 sur le même échantillon de 40 fichiers par profil (38 encodés, 2 illisibles conservés à leur taille d'origine dans la projection). PLY conservé de la calibration du 2026-11-11 sur deux fichiers ; ZIP et 3MF mesurés le 2026-11-14 sur la collection locale (voir zip_3mf_calibration).",
     "keep_topology": true,
     "budget_seconds_per_profile": 3600,
     "seed": 1,
@@ -42,6 +42,41 @@
         "files": 2,
         "keep_topology": true
       }
+    },
+    "zip_3mf_calibration": {
+      "date": "2026-11-14",
+      "files": 519,
+      "bytes": 19493983702,
+      "per_class": 8,
+      "budget_seconds_per_profile": 600,
+      "seed": 1,
+      "max_bytes": 314572800,
+      "keep_topology": true,
+      "encoded_files_by_profile": {
+        "lossless": 56,
+        "q14": 38,
+        "q16": 38,
+        "q20": 38,
+        "q25": 38
+      },
+      "unsupported_3mf": 24,
+      "source": "collection locale",
+      "previous_starting_values": {
+        "3mf": {
+          "lossless": 0.6,
+          "q14": 0.1,
+          "q16": 0.13,
+          "q20": 0.2,
+          "q25": 0.27
+        },
+        "zip": {
+          "lossless": 0.45,
+          "q14": 0.15,
+          "q16": 0.17,
+          "q20": 0.22,
+          "q25": 0.27
+        }
+      }
     }
   },
   "stl": {
@@ -66,17 +101,17 @@
     "q25": 0.084
   },
   "3mf": {
-    "lossless": 0.6,
-    "q14": 0.1,
-    "q16": 0.13,
-    "q20": 0.2,
-    "q25": 0.27
+    "lossless": 0.8496,
+    "q14": 0.6248,
+    "q16": 0.631,
+    "q20": 0.6512,
+    "q25": 0.6784
   },
   "zip": {
-    "lossless": 0.45,
-    "q14": 0.15,
-    "q16": 0.17,
-    "q20": 0.22,
-    "q25": 0.27
+    "lossless": 0.5194,
+    "q14": 0.3843,
+    "q16": 0.3921,
+    "q20": 0.4227,
+    "q25": 0.4544
   }
 }

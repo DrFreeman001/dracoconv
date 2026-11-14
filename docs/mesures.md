@@ -107,3 +107,19 @@ La machine de mesure n'a presque pas de fichier d'échange : Windows refuse de r
 - le nombre de conversions simultanées est borné par la mémoire encore réservable ;
 - un fichier qui manque de mémoire en parallèle est repris seul à la fin ;
 - si un processus de travail meurt, aucun fichier n'est perdu ni laissé en attente.
+
+## Ratios ZIP et 3MF mesurés (2026-11-14)
+
+Jusqu'ici, les ratios ZIP et 3MF étaient des valeurs de départ jamais mesurées. Mesure du 2026-11-14 sur la collection locale, en lecture seule : **519 fichiers, 19,49 Go**, fichiers de 300 Mio au plus, niveau 10, « Préserver la topologie » activé, 600 s par profil, 8 fichiers par classe de taille. 56 fichiers encodés sans quantification, 38 pour chaque profil quantifié ; 24 projets 3MF non lisibles laissés de côté.
+
+| Profil | ZIP mesuré | ZIP avant | 3MF mesuré | 3MF avant |
+|---|---|---|---|---|
+| Sans quantification | 0,519 | 0,45 | 0,850 | 0,60 |
+| 14 bits | 0,384 | 0,15 | 0,625 | 0,10 |
+| 16 bits | 0,392 | 0,17 | 0,631 | 0,13 |
+| 20 bits | 0,423 | 0,22 | 0,651 | 0,20 |
+| 25 bits | 0,454 | 0,27 | 0,678 | 0,27 |
+
+Les valeurs de départ étaient trop optimistes, surtout pour le 3MF quantifié (0,10 annoncé, 0,625 mesuré). Les projections de gain pour ces deux types sont donc nettement revues à la baisse. Un premier essai sur trois fichiers seulement donnait des ratios encore moins favorables (3MF sans quantification : 1,0) ; il n'a pas été retenu.
+
+Reste non mesuré : les fichiers de plus de 300 Mio, et un `.drc` exporté par OrcaSlicer puis relu par dracoconv.
