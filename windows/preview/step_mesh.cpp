@@ -45,31 +45,35 @@
 #include <Standard_Failure.hxx>
 
 static const uint32_t MAX_VERTICES = 20000000, MAX_FACES = 30000000;
-static const uint32_t DEFAULT_COLOR = 65 | 135 << 8 | 205 << 16 | 255u << 24;  // bleu de l'aperçu, octets R, V, B, opacité
-static const uint32_t GLAZING_ALPHA = 80;  // opacité donnée à un vitrage reconnu à son nom
-static const char* const GLAZING_WORDS[] = {"polycarbonate", "acrylic", "glass", "transparent", "translucent",
-                                            "plexi", "pmma", "clear", "tinted"};
+static const uint32_t DEFAULT_COLOR =
+    65 | 135 << 8 | 205 << 16 | 255u << 24; // bleu de l'aperçu, octets R, V, B, opacité
+static const uint32_t GLAZING_ALPHA = 80;   // opacité donnée à un vitrage reconnu à son nom
+static const char *const GLAZING_WORDS[] = {"polycarbonate", "acrylic", "glass", "transparent", "translucent",
+                                            "plexi",         "pmma",    "clear", "tinted"};
 
-static uint32_t byte(double v) { return uint32_t((std::min)(255.0, (std::max)(0.0, v * 255.0 + 0.5))); }
+static uint32_t byte(double v) {
+    return uint32_t((std::min)(255.0, (std::max)(0.0, v * 255.0 + 0.5)));
+}
 
 static bool is_glazing(std::string name) {
-    for (char& c : name) c = char(std::tolower(static_cast<unsigned char>(c)));
-    for (const char* word : GLAZING_WORDS)
+    for (char &c : name)
+        c = char(std::tolower(static_cast<unsigned char>(c)));
+    for (const char *word : GLAZING_WORDS)
         if (name.find(word) != std::string::npos) return true;
     return false;
 }
 
-static std::string utf8(const wchar_t* text) {
+static std::string utf8(const wchar_t *text) {
     int n = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
     std::string out(n > 0 ? n - 1 : 0, '\0');
     if (n > 1) WideCharToMultiByte(CP_UTF8, 0, text, -1, out.data(), n, nullptr, nullptr);
     return out;
 }
 
-static int write_mesh(const wchar_t* path, const std::vector<float>& points, const std::vector<uint32_t>& faces,
-                      const std::vector<uint32_t>& colors) {
+static int write_mesh(const wchar_t *path, const std::vector<float> &points, const std::vector<uint32_t> &faces,
+                      const std::vector<uint32_t> &colors) {
     std::wstring part = std::wstring(path) + L".part";
-    FILE* f = nullptr;
+    FILE *f = nullptr;
     if (_wfopen_s(&f, part.c_str(), L"wb") || !f) return 5;
     uint32_t header[2] = {uint32_t(points.size() / 3), uint32_t(faces.size() / 3)};
     bool ok = fwrite("DCMESH3", 1, 8, f) == 8 && fwrite(header, 4, 2, f) == 2 &&
@@ -84,7 +88,7 @@ static int write_mesh(const wchar_t* path, const std::vector<float>& points, con
     return 0;
 }
 
-static int run(const wchar_t* input, const wchar_t* output) {
+static int run(const wchar_t *input, const wchar_t *output) {
     TopoDS_Compound shape;
     NCollection_DataMap<TopoDS_Shape, uint32_t, TopTools_ShapeMapHasher> face_colors;
     std::vector<uint32_t> glazing;
@@ -126,16 +130,18 @@ static int run(const wchar_t* input, const wchar_t* output) {
         // Du plus englobant au plus précis : la couleur d'une face l'emporte sur celle de son solide.
         for (int kind = TopAbs_COMPOUND; kind <= TopAbs_FACE; ++kind) {
             for (int i = 1; i <= styles.Extent(); ++i) {
-                const TopoDS_Shape& styled = styles.FindKey(i);
-                const XCAFPrs_Style& style = styles.FindFromIndex(i);
+                const TopoDS_Shape &styled = styles.FindKey(i);
+                const XCAFPrs_Style &style = styles.FindFromIndex(i);
                 if (styled.ShapeType() != kind || !style.IsSetColorSurf()) continue;
                 double r, g, b;
                 style.GetColorSurf().Values(r, g, b, Quantity_TOC_sRGB);
                 const uint32_t rgb = byte(r) | byte(g) << 8 | byte(b) << 16;
                 uint32_t alpha = byte(style.GetColorSurfRGBA().Alpha());
-                if (alpha == 255 && std::find(glazing.begin(), glazing.end(), rgb) != glazing.end()) alpha = GLAZING_ALPHA;
+                if (alpha == 255 && std::find(glazing.begin(), glazing.end(), rgb) != glazing.end())
+                    alpha = GLAZING_ALPHA;
                 const uint32_t color = rgb | alpha << 24;
-                for (TopExp_Explorer it(styled, TopAbs_FACE); it.More(); it.Next()) face_colors.Bind(it.Current(), color);
+                for (TopExp_Explorer it(styled, TopAbs_FACE); it.More(); it.Next())
+                    face_colors.Bind(it.Current(), color);
             }
         }
     }
@@ -153,7 +159,7 @@ static int run(const wchar_t* input, const wchar_t* output) {
     std::vector<uint32_t> faces;
     std::vector<uint32_t> colors;
     for (TopExp_Explorer it(shape, TopAbs_FACE); it.More(); it.Next()) {
-        const TopoDS_Face& face = TopoDS::Face(it.Current());
+        const TopoDS_Face &face = TopoDS::Face(it.Current());
         TopLoc_Location location;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, location);
         if (tri.IsNull()) continue;
@@ -184,7 +190,7 @@ static int run(const wchar_t* input, const wchar_t* output) {
     return write_mesh(output, points, faces, colors);
 }
 
-int wmain(int argc, wchar_t** argv) {
+int wmain(int argc, wchar_t **argv) {
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     if (argc != 3) {
         fwprintf(stderr, L"usage: step_mesh <input.step> <output.mesh>\n");
@@ -192,9 +198,9 @@ int wmain(int argc, wchar_t** argv) {
     }
     try {
         return run(argv[1], argv[2]);
-    } catch (const Standard_Failure& failure) {
+    } catch (const Standard_Failure &failure) {
         fprintf(stderr, "OCCT: %s\n", failure.what());
-    } catch (const std::exception& failure) {
+    } catch (const std::exception &failure) {
         fprintf(stderr, "%s\n", failure.what());
     } catch (...) {
         fprintf(stderr, "unknown failure\n");
