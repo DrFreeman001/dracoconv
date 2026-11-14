@@ -101,3 +101,14 @@ Essai avec un `step_mesh.exe` instrumenté (retiré ensuite), sources lues seule
 - **Non vérifié :** un fichier STEP assez gros pour dépasser l'ancien délai (aucun dans la collection) ; le volet d'aperçu à l'œil après ce changement ; `test_failure.py` (à ne pas lancer tant que l'extension est installée). La limite mémoire de 1 536 Mio n'a pas bougé et peut devenir la première atteinte.
 
 **Contrôle à l'écran, même jour.** Carte BTT EBB42 (29 Mo) sélectionnée dans le vrai Explorer, volet d'aperçu ouvert : modèle complet et en couleurs (carte noire, bornier vert, entretoises jaunes, connecteurs blancs) avec la nouvelle DLL. Rotation à la souris non rejouée.
+
+## 14 novembre 2026 — essai sur un très gros STEP (Rat Rig V-Core 4.1 500 IDEX)
+
+Fichier exporté d'Autodesk Fusion par l'utilisateur : 142 Mo, 790 solides, 50 638 faces. Source lue seulement, SHA-256 inchangé.
+
+- **Aperçu normal :** refusé aussitôt (limite d'entrée de 64 Mio), sans lecture.
+- **Lecteur seul, hors limites :** réussi en 46,7 s, 1 634 Mio réservés au pic ; 3 292 965 sommets, 3 435 920 triangles, maillage de 86 Mio.
+- **Dessin :** 0,3 s pour la première image, 0,015 s pour la suivante ; auxiliaire à 1 084 Mio au pic.
+- **Image :** modèle complet et en couleurs, mais les panneaux du caisson, transparents dans la CAO, sont dessinés opaques et cachent l'intérieur. La transparence n'est pas lue.
+
+Il dépasse donc les trois limites actuelles : 64 Mio d'entrée, 40 s de lecteur, 1 536 Mio de job (le lecteur seul en demande 1 634). Limites non modifiées.
