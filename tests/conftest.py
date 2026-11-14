@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["DRACOCONV_NO_UPDATE_CHECK"] = "1"  # aucun accès réseau pendant les tests
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dracoconv.mesh import Mesh  # noqa: E402
@@ -186,3 +187,10 @@ def make_encrypted_zip(path) -> Path:
     raw[central + 8] |= 1
     Path(path).write_bytes(bytes(raw))
     return Path(path)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_user_folders(tmp_path, monkeypatch):
+    """Réglages et journaux dans un dossier temporaire : les tests ne touchent pas à ceux de l'utilisateur."""
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))

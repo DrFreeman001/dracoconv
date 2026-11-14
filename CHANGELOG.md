@@ -1,5 +1,10 @@
 # Journal des versions
 
+## 0.2.0 — novembre 2026
+
+- Avis de nouvelle version : une vérification par jour sur GitHub, à décocher dans le menu « Aide ».
+- Menu « Aide » avec le lien vers la page du projet.
+
 ## 0.1.0 — novembre 2026
 
 Première version.

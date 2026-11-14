@@ -88,6 +88,8 @@ Cinq étapes :
 
 **Clic droit dans l'Explorateur** (avec l'installateur, option cochée par défaut) : « Convertir en .drc avec dracoconv » sur les STL, OBJ, PLY et 3MF, « Convertir depuis .drc » sur les `.drc`, « Convertir avec dracoconv » sur un dossier. Sous Windows 11, ces entrées sont dans « Afficher plus d'options ». Une sélection de plusieurs fichiers ouvre une seule fenêtre, déjà analysée ; rien n'est converti avant votre confirmation. En ligne de commande : `dracoconv-gui [--encode|--decode] chemins...`.
 
+Le menu **Aide** mène à la page du projet et règle l'avis de nouvelle version : au plus une vérification par jour sur GitHub, sans rien envoyer d'autre que la requête ; décochez-le pour ne plus rien demander.
+
 La langue se change dans le menu, sans redémarrer. Le menu **Apparence** permet de choisir **Système**, **Clair** ou **Sombre** ; le choix est mémorisé.
 
 Une barre animée indique le travail pendant l’analyse, l’estimation et la conversion. Le compteur de conversion affiche les fichiers terminés et le pourcentage du lot ; il ne prétend pas mesurer la progression interne de l’encodeur sur un fichier.

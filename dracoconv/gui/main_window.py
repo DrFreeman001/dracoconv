@@ -1,9 +1,10 @@
 """Fenêtre principale : cinq étapes, changement de langue sans redémarrage."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QActionGroup
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtWidgets import (
+    QLabel,
     QApplication, QHBoxLayout, QListWidget, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
@@ -16,6 +17,24 @@ from .pages.projection import ProjectionPage
 from .pages.settings import SettingsPage
 from .pages.source import SourcePage
 from .state import AppState
+
+class _UpdateNotice(QObject):
+    """Vérification en arrière-plan ; le signal found arrive sur le fil de l'interface."""
+
+    found = Signal(str)
+
+    def start(self) -> None:
+        import threading
+
+        from .. import updates
+
+        def run() -> None:
+            version = updates.newer_version()
+            if version:
+                self.found.emit(version)
+
+        threading.Thread(target=run, daemon=True).start()
+
 
 _STEPS = ("source", "settings", "projection", "convert", "journal")
 _LANGUAGE_NAMES = {"fr": "Français", "en": "English"}
@@ -79,6 +98,23 @@ class MainWindow(QMainWindow):
         self._theme = "system"
         QApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self.set_theme(load_prefs().get("theme", "system"), persist=False)
+
+        from .. import updates
+
+        self.help_menu = self.menuBar().addMenu("")
+        self.updates_action = QAction("", self, checkable=True)
+        self.updates_action.setChecked(updates.enabled())
+        self.updates_action.toggled.connect(updates.set_enabled)
+        self.project_action = QAction("", self)
+        self.project_action.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://github.com/DrFreeman001/dracoconv")))
+        self.help_menu.addAction(self.updates_action)
+        self.help_menu.addAction(self.project_action)
+        self._new_version = None
+        self._update_notice = _UpdateNotice(self)
+        self._update_notice.found.connect(self._show_new_version)
+        if updates.due():
+            self._update_notice.start()
 
         self.steps.currentRowChanged.connect(self._show_step)
         self.previous_button.clicked.connect(lambda: self.steps.setCurrentRow(max(0, self.steps.currentRow() - 1)))
@@ -162,8 +198,20 @@ class MainWindow(QMainWindow):
         self.language_actions[lang].setChecked(True)
         self.retranslate()
 
+    def _show_new_version(self, version: str) -> None:
+        from .. import updates
+
+        self._new_version = version
+        label = QLabel()
+        label.setOpenExternalLinks(True)
+        label.setText(f'<a href="{updates.RELEASES}">' + tr("gui.update.available", version=version) + "</a>")
+        self.statusBar().addPermanentWidget(label)
+
     def retranslate(self) -> None:
         self.setWindowTitle(tr("gui.title"))
+        self.help_menu.setTitle(tr("gui.menu.help"))
+        self.updates_action.setText(tr("gui.update.check"))
+        self.project_action.setText(tr("gui.update.project"))
         self.theme_menu.setTitle(tr("gui.menu.theme"))
         for name, action in self.theme_actions.items():
             action.setText(tr("gui.theme." + name))

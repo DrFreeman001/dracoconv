@@ -351,5 +351,9 @@
   "gui.theme.system": "System",
   "gui.theme.light": "Light",
   "gui.theme.dark": "Dark",
-  "gui.activity": "Processing — internal progress unavailable"
+  "gui.activity": "Processing — internal progress unavailable",
+  "gui.menu.help": "Help",
+  "gui.update.check": "Tell me about new versions (one check a day)",
+  "gui.update.project": "Project page on GitHub",
+  "gui.update.available": "New version {version} available"
 }

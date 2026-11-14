@@ -351,5 +351,9 @@
   "gui.theme.system": "Système",
   "gui.theme.light": "Clair",
   "gui.theme.dark": "Sombre",
-  "gui.activity": "Traitement en cours — progression interne non disponible"
+  "gui.activity": "Traitement en cours — progression interne non disponible",
+  "gui.menu.help": "Aide",
+  "gui.update.check": "Signaler les nouvelles versions (une vérification par jour)",
+  "gui.update.project": "Page du projet sur GitHub",
+  "gui.update.available": "Nouvelle version {version} disponible"
 }
