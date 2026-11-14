@@ -22,7 +22,9 @@ Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'o
 
 ## Installation
 
-Windows, Python 3.11 ou plus récent.
+**Le plus simple :** téléchargez `dracoconv-<version>-setup.exe` dans les [versions publiées](https://github.com/DrFreeman001/dracoconv/releases/latest) et lancez-le. Installation pour vous seul, sans droits d'administrateur, désinstallation depuis « Applications installées ». L'installateur n'étant pas signé, Windows SmartScreen peut afficher « éditeur inconnu » : « Informations complémentaires », puis « Exécuter quand même ».
+
+**Depuis les sources :** Windows, Python 3.11 ou plus récent.
 
 ```bash
 git clone https://github.com/DrFreeman001/dracoconv.git dracoconv
@@ -52,7 +54,11 @@ Pour un dossier utilisable sur un PC sans Python (fenêtre `dracoconv-gui.exe` e
 pwsh tools/build_exe.ps1
 ```
 
-Le résultat est dans `dist/dracoconv` ; copiez le dossier entier.
+Le résultat est dans `dist/dracoconv` ; copiez le dossier entier. Pour en faire un installateur (Inno Setup 6 nécessaire) :
+
+```bash
+pwsh tools/build_installer.ps1
+```
 
 ### Moteur de référence
 

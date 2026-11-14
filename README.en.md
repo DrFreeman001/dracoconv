@@ -22,7 +22,9 @@ Built to archive a collection of 3D-printing models: the `.drc` files open in Or
 
 ## Installation
 
-Windows, Python 3.11 or newer.
+**Easiest:** download `dracoconv-<version>-setup.exe` from the [releases](https://github.com/DrFreeman001/dracoconv/releases/latest) and run it. Per-user install, no administrator rights, uninstall from "Installed apps". The installer is not signed, so Windows SmartScreen may say "unknown publisher": "More info", then "Run anyway".
+
+**From source:** Windows, Python 3.11 or newer.
 
 ```bash
 git clone https://github.com/DrFreeman001/dracoconv.git dracoconv
@@ -52,7 +54,11 @@ To get a folder that runs on a PC without Python (window `dracoconv-gui.exe` and
 pwsh tools/build_exe.ps1
 ```
 
-The result is in `dist/dracoconv`; copy the whole folder.
+The result is in `dist/dracoconv`; copy the whole folder. To turn it into an installer (Inno Setup 6 required):
+
+```bash
+pwsh tools/build_installer.ps1
+```
 
 ### Reference engine
 
