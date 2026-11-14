@@ -40,6 +40,22 @@ py -m venv .venv
 .venv\Scripts\python -m pip install -e .
 ```
 
+### Version sans Python
+
+Pour un dossier utilisable sur un PC sans Python (fenêtre `dracoconv-gui.exe` et ligne de commande `dracoconv.exe`, environ 250 Mo) :
+
+```bash
+.venv\Scripts\python -m pip install pyinstaller
+```
+
+```bash
+pwsh tools/build_exe.ps1
+```
+
+Le résultat est dans `dist/dracoconv` ; copiez le dossier entier.
+
+### Moteur de référence
+
 Le moteur intégré suffit pour l'usage courant. Trois réglages (`--metadata`, `--preserve-polygons`, `--generic-bits`) et les 30 bits demandent en plus les outils officiels de Google, à compiler une fois (git et les outils de compilation Microsoft C++ sont nécessaires) :
 
 ```bash

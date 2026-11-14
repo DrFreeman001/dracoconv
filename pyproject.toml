@@ -34,7 +34,7 @@ Homepage = "https://github.com/DrFreeman001/dracoconv"
 Issues = "https://github.com/DrFreeman001/dracoconv/issues"
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt", "cmake"]
+dev = ["pytest", "pytest-qt", "cmake", "pyinstaller"]
 
 [project.scripts]
 dracoconv = "dracoconv.cli:main"
