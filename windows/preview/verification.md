@@ -133,3 +133,13 @@ Fait : `step_mesh.exe` lit l'opacité standard quand elle existe et, à défaut,
 - Rat Rig (142 Mo), hors Explorer : lecteur 50,8 s, 1 616 Mio réservés ; dessin 0,3 s ; la machine est visible à travers les panneaux.
 - Vrai Explorer, volet d'aperçu : même image, machine visible à travers le caisson.
 - **Limites :** deux pièces opaques de la même couleur exacte qu'un vitrage deviendraient translucides aussi. Les faces translucides ne sont pas triées entre elles. La miniature déjà en cache reste opaque jusqu'à son renouvellement. L'opacité standard du format n'a été vérifiée sur aucun fichier réel, faute d'exemple.
+
+## 14 novembre 2026 — nettoyage après plantage, build portable, rangement
+
+- **Mise en forme :** `bridge.cpp`, `step_mesh.cpp` et les sondes passés à clang-format (`.clang-format`). Contrôle : texte identique une fois les espaces retirés. `bridge.cpp` passe de 135 à 489 lignes, plus aucune au-delà de 120 caractères.
+- **Nettoyage après plantage :** la DLL crée et tient `lease.v1` dans son dossier temporaire ; l'auxiliaire ramasse au démarrage les dossiers dont le bail est libre. Testé côté Python (`tests/test_preview_temp.py`) : dossier mort supprimé, dossier vivant, ancien dossier sans bail et dossier contenant un fichier inconnu laissés en place.
+- **Build :** `build.ps1` trouve Visual Studio par `vswhere` et le SDK par le registre, au lieu de chemins fixes. `-CheckOnly` compile `bridge.cpp` sans toucher à la DLL installée. Sondes déplacées dans `probes/`.
+- **Registre :** libellés « DracoConv 3D thumbnail / preview » au lieu de « prototype » ; extension désinscrite puis réinscrite.
+- **Anciens dossiers temporaires :** cinq dossiers sans bail supprimés à la main. Erreur de manipulation à noter : le premier passage a aussi vidé le dossier d'un aperçu encore ouvert (copies temporaires seulement, aucun fichier de l'utilisateur) ; il sera retiré à la fermeture de cet aperçu.
+
+**Non fait à cette date :** la DLL installée est encore l'ancienne. La nouvelle (avec le bail) compile, mais n'est ni installée ni essayée dans Explorer : il faut arrêter Explorer pour la remplacer. Le ramassage n'a donc pas été vu à l'œuvre après un vrai plantage.

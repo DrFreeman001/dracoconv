@@ -37,7 +37,7 @@ class Handler : public IInitializeWithStream,
     long refs = 1;
     bool thumbnail;
     std::wstring dir, input;
-    HANDLE job = nullptr, process = nullptr, previewGate = nullptr;
+    HANDLE job = nullptr, process = nullptr, previewGate = nullptr, lease = nullptr;
     ULONGLONG started = 0;
     bool ready = false;
     HWND parent = nullptr, window = nullptr;
@@ -135,6 +135,11 @@ class Handler : public IInitializeWithStream,
             DeleteFileW((dir + L"\\thumb.png").c_str());
             DeleteFileW((dir + L"\\ready").c_str());
             DeleteFileW((dir + L"\\events.log").c_str());
+            if (lease) {
+                CloseHandle(lease);
+                lease = nullptr;
+            }
+            DeleteFileW((dir + L"\\lease.v1").c_str());
             RemoveDirectoryW(dir.c_str());
             input.clear();
         }
@@ -241,6 +246,18 @@ public:
         dir = base + L"\\" + name;
         if (!CreateDirectoryW(dir.c_str(), nullptr)) return error();
         input = dir + L"\\input.drc";
+        // Bail exclusif tenu jusqu'au nettoyage. S'il peut être rouvert, son propriétaire est mort (plantage de l'hôte)
+        // et le dossier est ramassé par l'auxiliaire suivant : voir collect_stale dans dracoconv/preview_temp.py.
+        static const char marker[] = "DracoConvPreview lease v1\n";
+        DWORD marked = 0;
+        lease = CreateFileW((dir + L"\\lease.v1").c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                            FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        if (lease == INVALID_HANDLE_VALUE) lease = nullptr;
+        if (!lease || !WriteFile(lease, marker, sizeof(marker) - 1, &marked, nullptr) || marked != sizeof(marker) - 1) {
+            hr = error();
+            cleanup();
+            return hr;
+        }
         HANDLE f = CreateFileW(input.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr);
         if (f == INVALID_HANDLE_VALUE) {
             hr = error();

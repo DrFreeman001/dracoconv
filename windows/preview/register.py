@@ -1,4 +1,4 @@
-"""Reversible per-user prototype registration. Never changes default file opening."""
+"""Reversible per-user registration. Never changes default file opening."""
 from pathlib import Path
 import argparse
 import ctypes
@@ -64,10 +64,10 @@ def file_classes(ext):
 def values():
     dll=str(HERE/'build/DracoPreview.dll')
     rows=[]
-    for clsid,label in [(THUMB,'DracoConv prototype thumbnail'),(PREVIEW,'DracoConv prototype preview')]:
+    for clsid,label in [(THUMB,'DracoConv 3D thumbnail'),(PREVIEW,'DracoConv 3D preview')]:
         base='Software\\Classes\\CLSID\\'+clsid
         rows += [(base,'',label),(base+'\\InprocServer32','',dll),(base+'\\InprocServer32','ThreadingModel','Apartment')]
-    rows += [('Software\\Classes\\CLSID\\'+PREVIEW,'AppID','{6D2B5079-2F0B-48DD-AB7F-97CEC514D30B}'),('Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers',PREVIEW,'DracoConv prototype preview')]
+    rows += [('Software\\Classes\\CLSID\\'+PREVIEW,'AppID','{6D2B5079-2F0B-48DD-AB7F-97CEC514D30B}'),('Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers',PREVIEW,'DracoConv 3D preview')]
     for ext,location in EXTENSIONS.items():
         classes=file_classes(ext)
         for handler,clsid in [('{E357FCCD-A995-4576-B01F-234630154E96}',THUMB),('{8895B1C6-B41F-4C1C-A562-0D564250836F}',PREVIEW)]:

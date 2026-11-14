@@ -104,3 +104,25 @@ def test_crashed_owner_releases_kernel_lease(job):
     assert result.returncode == 17, result.stderr
     with preview_temp.try_claim_stale(job) as claim:
         assert claim is not None
+
+
+def test_collect_removes_only_dead_owners(tmp_path):
+    base = tmp_path / "DracoConvPreview"
+    names = ["{00000000-0000-0000-0000-00000000000%d}" % i for i in range(4)]
+    dead, live, legacy, odd = (base / name for name in names)
+    for job in (dead, live, legacy, odd):
+        job.mkdir(parents=True)
+        (job / "input.drc").write_bytes(b"model")
+    (dead / "model.mesh").write_bytes(b"mesh")
+    preview_temp.create_lease(dead).close()
+    preview_temp.create_lease(odd).close()
+    (odd / "notes.txt").write_bytes(b"not ours")
+    (base / "not-a-job").mkdir()
+    with preview_temp.create_lease(live):
+        assert preview_temp.collect_stale(base) == 1
+        assert not dead.exists()
+        assert (live / "input.drc").exists() and (legacy / "input.drc").exists()
+        assert sorted(p.name for p in odd.iterdir()) == ["input.drc", "lease.v1", "notes.txt"]
+        assert (base / "not-a-job").is_dir()
+    assert preview_temp.collect_stale(base) == 1 and not live.exists()
+    assert preview_temp.collect_stale(tmp_path / "missing") == 0

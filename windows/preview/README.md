@@ -7,10 +7,10 @@ Depuis la racine du dépôt, PowerShell :
 ```powershell
 .venv/Scripts/python.exe windows/preview/configure.py
 python -I windows/preview/fetch_occt.py   # une fois : OpenCascade pour STEP, dans third_party
-./windows/preview/build.ps1
+./windows/preview/build.ps1                # trouve seul Visual Studio (vswhere) et le SDK Windows
 .venv/Scripts/python.exe -m pytest tests/test_shell_preview.py tests/test_shell_registration.py -q
 ./windows/preview/build/probe.exe
-.venv/Scripts/python.exe windows/preview/test_failure.py
+.venv/Scripts/python.exe windows/preview/probes/test_failure.py
 .venv/Scripts/python.exe windows/preview/register.py install
 ./windows/preview/build/cache_probe.exe (Join-Path $PWD 'windows\preview\cube.drc')
 ```
@@ -30,6 +30,6 @@ Limites : 64 Mio pour un Draco, 200 Mio pour un STEP, 3072 Mio par job, 90 s pou
 
 STEP : le format est reconnu au contenu (`ISO-10303-21`), pas au nom. L’auxiliaire lance `build/step/step_mesh.exe`, programme natif lié à OpenCascade 8.0.1, dans le même job : il lit le fichier, le découpe en triangles (flèche 0,1 % de la plus grande dimension) et écrit `model.mesh` (positions, triangles, couleur et opacité par sommet) dans le dossier temporaire, supprimé après lecture. Il a 80 s. `stage_step.py` copie à côté de lui les 45 DLL nécessaires (46 Mo, dont FreeImage et FreeType qu’OpenCascade charge sans s’en servir ici) ; le runtime Visual C++ reste celui de Windows. Le paquet OpenCascade de conda-forge est choisi plutôt que la bibliothèque Python OCP : importer OCP réserve à lui seul 860 Mo, ce qui dépasse la limite du job une fois le rendu ajouté. Les couleurs des pièces et des faces du fichier sont lues (lecteur XCAF) et dessinées ; une face sans couleur garde le bleu par défaut. La transparence est lue aussi ; quand le fichier n’en donne pas (export Fusion), une couleur dont le nom désigne un vitrage (« Polycarbonate », « Glass », « Acrylic », « Clear », « Tinted »...) est dessinée translucide. Les faces translucides sont dessinées après les autres, sans tri entre elles. Le dessin de secours sans OpenGL reste d’une seule couleur. `build.ps1 -StepOnly` recompile ce lecteur seul, sans toucher à la DLL verrouillée par Explorer.
 
-`inspect_integrity.py PID...` relève les niveaux d’intégrité sans modifier les processus. Les entrées temporaires sont privées au profil utilisateur sous LocalLow/DracoConvPreview et supprimées au déchargement normal. Une interruption brutale de l’hôte peut laisser un dossier temporaire ; une collecte de ces restes reste à implémenter avant distribution.
+`probes/inspect_integrity.py PID...` relève les niveaux d’intégrité sans modifier les processus. Les entrées temporaires sont privées au profil utilisateur sous LocalLow/DracoConvPreview et supprimées au déchargement normal. Une interruption brutale de l’hôte peut laisser un dossier temporaire : la DLL tient un bail exclusif (`lease.v1`) dans chaque dossier, et l’auxiliaire suivant supprime les dossiers dont le bail est libre (`collect_stale` dans `dracoconv/preview_temp.py`), fichier par fichier et par nom connu seulement.
 
 État au 13 novembre 2026 : extension validée dans Explorer pour `.drc`, `.step` et `.stp` (voir [verification.md](verification.md)). Elle reste un prototype : les chemins de `build/preview.ini` sont propres à cette copie du dépôt, il n’y a pas d’installateur, et le parcours Tab/Maj+Tab ne fonctionne pas.

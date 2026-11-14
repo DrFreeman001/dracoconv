@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget
 from dracoconv import preview_rendering as gpu_rendering
-from dracoconv import step_preview
+from dracoconv import preview_temp, step_preview
 
 MAX_INPUT = gpu_rendering.MAX_INPUT
 # Les modèles d'impression 3D ont Z vertical, comme dans les trancheurs.
@@ -227,6 +227,13 @@ def main():
     parser.add_argument('--size', type=int, default=256)
     parser.add_argument('--parent', type=int)
     args = parser.parse_args()
+    # Ramasse les dossiers temporaires laissés par un hôte d'aperçu qui a planté ; ne doit jamais gêner l'aperçu.
+    jobs = Path(args.input).resolve().parent.parent
+    if jobs.name == 'DracoConvPreview':
+        try:
+            preview_temp.collect_stale(jobs)
+        except Exception:
+            pass
     app = QApplication([])
     if args.output:
         image, _ = render_thumbnail(Path(args.input), args.size)

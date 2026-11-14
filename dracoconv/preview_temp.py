@@ -1,4 +1,4 @@
-"""Windows preview ownership leases. No filesystem deletion is performed here.
+"""Windows preview ownership leases, and collection of job directories whose owner died.
 
 A claim is an exclusive ownership lock, not a race-free deletion capability.
 The caller must keep it open and pin/revalidate native directory handles before
@@ -130,3 +130,35 @@ def try_claim_stale(job: Path) -> PreviewLease | None:
         if lease is not None:
             lease.close()
         return None
+
+
+def collect_stale(base: Path) -> int:
+    """Remove job directories under base whose owner died; returns how many were removed.
+
+    A directory is taken only through try_claim_stale: recognized entries, plain files, and a
+    lease nobody holds. Deletion is by exact known name, never recursive; anything unexpected
+    leaves the directory in place. Directories without a lease (older versions) are not touched.
+    """
+    removed = 0
+    try:
+        jobs = [job for job in Path(base).iterdir() if _GUID.fullmatch(job.name)]
+    except OSError:
+        return 0
+    for job in jobs:
+        lease = try_claim_stale(job)
+        if lease is None:
+            continue
+        try:
+            for name in _NAMES - {"lease.v1"}:
+                (job / name).unlink(missing_ok=True)
+        except OSError:
+            lease.close()
+            continue
+        lease.close()
+        try:
+            (job / "lease.v1").unlink()
+            job.rmdir()
+            removed += 1
+        except OSError:
+            pass
+    return removed
