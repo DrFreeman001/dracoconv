@@ -108,3 +108,15 @@ def test_sampled_fallback_comes_from_the_decoded_mesh(tmp_path):
     mesh = shell_preview.load_model(stored(tmp_path))
     tris, reduced = shell_preview.sample_triangles(mesh, 1)
     assert tris.shape == (1, 3, 3) and reduced
+
+
+def test_step_has_its_own_larger_size_limit(tmp_path, monkeypatch):
+    from dracoconv import shell_preview
+    assert shell_preview.step_preview.MAX_INPUT == 200 * 1024 * 1024
+    source = stored(tmp_path, b'ISO-10303-21;' + b' ' * 100)
+    monkeypatch.setattr(shell_preview, 'MAX_INPUT', 10)
+    monkeypatch.setattr(shell_preview.step_preview, 'mesh_step', lambda source, output: 'mesh')
+    assert shell_preview.load_model(source) == 'mesh'
+    monkeypatch.setattr(shell_preview.step_preview, 'MAX_INPUT', 50)
+    with pytest.raises(ValueError, match='limit'):
+        shell_preview.load_model(source)

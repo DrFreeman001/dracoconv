@@ -112,3 +112,14 @@ Fichier exporté d'Autodesk Fusion par l'utilisateur : 142 Mo, 790 solides, 50 6
 - **Image :** modèle complet et en couleurs, mais les panneaux du caisson, transparents dans la CAO, sont dessinés opaques et cachent l'intérieur. La transparence n'est pas lue.
 
 Il dépasse donc les trois limites actuelles : 64 Mio d'entrée, 40 s de lecteur, 1 536 Mio de job (le lecteur seul en demande 1 634). Limites non modifiées.
+
+## 14 novembre 2026 — limites relevées pour les gros assemblages STEP
+
+À la demande de l'utilisateur : 200 Mio d'entrée pour un STEP (64 Mio inchangé pour un Draco), 90 s dans `bridge.cpp`, 80 s pour `step_mesh.exe`, 3 072 Mio par job. DLL recompilée Explorer arrêté, puis Explorer relancé.
+
+Essai dans le vrai Explorer sur le Rat Rig V-Core 4.1 500 IDEX (142 Mo), source inchangée (SHA-256 identique) :
+- miniature produite et affichée ;
+- volet d'aperçu : modèle complet affiché après environ une minute de « Chargement... » ;
+- relevés pendant l'essai : auxiliaire d'aperçu 944 Mio réservés, lecteur 963 Mio de mémoire vive au pic ; 3 930 Mio réservés au pic, aperçu et miniature cumulés (deux jobs distincts).
+
+**Constaté :** Explorer relance la lecture pour la miniature pendant que l'aperçu est ouvert ; chaque lecture coûte environ 50 s de processeur. Les panneaux du caisson restent opaques (transparence non lue). **Non mesuré :** la marge exacte sous 3 072 Mio dans un seul job, et un fichier proche de 200 Mio.

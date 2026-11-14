@@ -11,8 +11,10 @@ from dracoconv.preview_rendering import MAX_FACES, MAX_VERTICES, DisplayMesh, pr
 
 STEP_TOOL = Path(__file__).resolve().parents[1] / 'windows' / 'preview' / 'build' / 'step' / 'step_mesh.exe'
 MAGIC = b'DCMESH2\0'
-# L’auxiliaire dispose de 45 s en tout (bridge.cpp) ; on garde de quoi démarrer Qt et dessiner.
-TIMEOUT = 40
+# L’auxiliaire dispose de 90 s en tout (bridge.cpp) ; on garde de quoi démarrer Qt et dessiner.
+TIMEOUT = 80
+# Un assemblage STEP complet dépasse vite 100 Mo (Rat Rig V-Core 4.1 : 142 Mo, lu en 47 s avec 1,6 Gio).
+MAX_INPUT = 200 * 1024 * 1024
 _ERRORS = {2: 'Invalid STEP input', 3: 'STEP file has no surfaces', 4: 'STEP model exceeds preview limit',
            5: 'Cannot write STEP mesh', 6: 'STEP reader failed'}
 

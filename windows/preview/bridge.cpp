@@ -39,7 +39,7 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
  void monitor(){
   if(!process)return;
   if(GetFileAttributesW((dir+L"\\ready").c_str())!=INVALID_FILE_ATTRIBUTES)ready=true;
-  if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>45000)){
+  if(WaitForSingleObject(process,0)==WAIT_OBJECT_0||(!ready&&GetTickCount64()-started>90000)){
    stopHelper();SetWindowTextW(window,L"Apercu indisponible : chargement interrompu ou limite atteinte.");
   }
  }
@@ -50,7 +50,7 @@ class Handler:public IInitializeWithStream,public IThumbnailProvider,public IPre
  if(!*python||!*script)return E_UNEXPECTED;
  if(!thumbnail){previewGate=CreateMutexW(nullptr,FALSE,L"Local\\DracoConvPreview-06B7D1B9");if(!previewGate)return error();DWORD wait=WaitForSingleObject(previewGate,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED){CloseHandle(previewGate);previewGate=nullptr;return HRESULT_FROM_WIN32(ERROR_BUSY);}}
  job=CreateJobObjectW(nullptr,nullptr);if(!job)return error();
- JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_JOB_MEMORY|JOB_OBJECT_LIMIT_ACTIVE_PROCESS;limits.ProcessMemoryLimit=1536ull*1024*1024;limits.JobMemoryLimit=1536ull*1024*1024;limits.BasicLimitInformation.ActiveProcessLimit=4;
+ JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_JOB_MEMORY|JOB_OBJECT_LIMIT_ACTIVE_PROCESS;limits.ProcessMemoryLimit=3072ull*1024*1024;limits.JobMemoryLimit=3072ull*1024*1024;limits.BasicLimitInformation.ActiveProcessLimit=4;
  if(!SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits)))return error();
  std::wstring cmd=quote(python)+L" -I -B "+quote(script)+L" --input "+quote(input)+L" "+args;
  STARTUPINFOW si{};si.cb=sizeof(si);PROCESS_INFORMATION pi{};
@@ -79,14 +79,14 @@ public:
  if(!CreateDirectoryW(dir.c_str(),nullptr))return error();input=dir+L"\\input.drc";
  HANDLE f=CreateFileW(input.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_TEMPORARY,nullptr);if(f==INVALID_HANDLE_VALUE){hr=error();cleanup();return hr;}
  char buffer[65536];ULONG got=0;size_t total=0;
- do{hr=stream->Read(buffer,sizeof(buffer),&got);if(FAILED(hr))break;total+=got;if(total>64*1024*1024){hr=HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);break;}DWORD written;if(got&&(!WriteFile(f,buffer,got,&written,nullptr)||written!=got)){hr=error();break;}}while(got);
+ do{hr=stream->Read(buffer,sizeof(buffer),&got);if(FAILED(hr))break;total+=got;if(total>200*1024*1024){hr=HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);break;}DWORD written;if(got&&(!WriteFile(f,buffer,got,&written,nullptr)||written!=got)){hr=error();break;}}while(got);
  CloseHandle(f);if(FAILED(hr)||!total){cleanup();return FAILED(hr)?hr:E_INVALIDARG;}log(dir,L"initialized");return S_OK;
  }
  HRESULT STDMETHODCALLTYPE GetThumbnail(UINT cx,HBITMAP*out,WTS_ALPHATYPE*alpha)override{
  if(!out||!alpha)return E_POINTER;*out=nullptr;*alpha=WTSAT_UNKNOWN;if(input.empty())return E_UNEXPECTED;
  HANDLE mutex=CreateMutexW(nullptr,FALSE,L"Local\\DracoConvThumbnail-47E7A10B");if(!mutex)return error();DWORD wait=WaitForSingleObject(mutex,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED){CloseHandle(mutex);return HRESULT_FROM_WIN32(ERROR_BUSY);}
  std::wstring output=dir+L"\\thumb.png";HRESULT hr=launch(L"--output "+quote(output)+L" --size "+std::to_wstring(cx));
- if(SUCCEEDED(hr)){if(WaitForSingleObject(process,45000)!=WAIT_OBJECT_0)hr=HRESULT_FROM_WIN32(ERROR_TIMEOUT);else{DWORD code;GetExitCodeProcess(process,&code);if(code){printf("Helper exit %lu\n",code);hr=E_FAIL;}}}
+ if(SUCCEEDED(hr)){if(WaitForSingleObject(process,90000)!=WAIT_OBJECT_0)hr=HRESULT_FROM_WIN32(ERROR_TIMEOUT);else{DWORD code;GetExitCodeProcess(process,&code);if(code){printf("Helper exit %lu\n",code);hr=E_FAIL;}}}
  if(SUCCEEDED(hr)){
  IWICImagingFactory*factory=nullptr;IWICBitmapDecoder*decoder=nullptr;IWICBitmapFrameDecode*frame=nullptr;IWICFormatConverter*converter=nullptr;
  hr=CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&factory));

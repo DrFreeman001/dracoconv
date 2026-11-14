@@ -24,12 +24,15 @@ DEFAULT_VIEW = (30., 20., 1.)
 def load_model(path: Path):
     """Maillage complet du fichier, Draco ou STEP, reconnu par son contenu et non par son nom."""
     path = Path(path)
-    if not 0 < path.stat().st_size <= MAX_INPUT:
-        raise ValueError('Input exceeds preview limit or is empty')
+    size = path.stat().st_size
     with path.open('rb') as source:
         head = source.read(64)
     if step_preview.is_step(head):
+        if size > step_preview.MAX_INPUT:
+            raise ValueError('Input exceeds preview limit')
         return step_preview.mesh_step(path, path.with_name('model.mesh'))
+    if not 0 < size <= MAX_INPUT:
+        raise ValueError('Input exceeds preview limit or is empty')
     return gpu_rendering.decode_mesh(path.read_bytes())
 
 
