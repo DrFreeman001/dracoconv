@@ -143,3 +143,8 @@ Fait : `step_mesh.exe` lit l'opacité standard quand elle existe et, à défaut,
 - **Anciens dossiers temporaires :** cinq dossiers sans bail supprimés à la main. Erreur de manipulation à noter : le premier passage a aussi vidé le dossier d'un aperçu encore ouvert (copies temporaires seulement, aucun fichier de l'utilisateur) ; il sera retiré à la fermeture de cet aperçu.
 
 **Non fait à cette date :** la DLL installée est encore l'ancienne. La nouvelle (avec le bail) compile, mais n'est ni installée ni essayée dans Explorer : il faut arrêter Explorer pour la remplacer. Le ramassage n'a donc pas été vu à l'œuvre après un vrai plantage.
+
+**Suite, même jour : nouvelle DLL installée.** Explorer arrêté, DLL recompilée, Explorer relancé.
+- `probe.exe` : miniature et déchargement réussis ; `cache_probe.exe` sur un STEP neuf : miniature fournie par Windows (HRESULT 0).
+- Plantage simulé : `preview_probe.exe` (qui héberge la DLL) tué pendant un aperçu ouvert. Le dossier reste, avec `events.log`, `input.drc`, `lease.v1` et `ready` ; l'auxiliaire est bien arrêté par le job. Au lancement suivant (`probe.exe`), le dossier abandonné a disparu : 0 dossier restant.
+- Non refait : le contrôle à l'œil du volet d'aperçu après ce changement, et un plantage de `prevhost.exe` lui-même (interdit tant qu'Explorer tourne).
