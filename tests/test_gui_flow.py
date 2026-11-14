@@ -231,3 +231,41 @@ def test_language_menu(qtbot, window):
     window.language_actions["en"].trigger()
     assert window.language_actions["en"].isChecked() and window.windowTitle() == tr("gui.title")
     assert window.steps.item(1).text().endswith("Settings")
+
+
+def test_launch_arguments_and_direction():
+    from pathlib import Path
+
+    from dracoconv.gui.launch import infer_direction, parse
+
+    assert parse(["--decode", "a.drc", "", "b.drc"]) == ("decode", [Path("a.drc"), Path("b.drc")])
+    assert parse(["x.stl"]) == (None, [Path("x.stl")])
+    assert infer_direction([Path("a.DRC"), Path("b.drc")]) == "decode"
+    assert infer_direction([Path("a.drc"), Path("b.stl")]) == "encode"
+    assert infer_direction([Path("dossier")]) == "encode"
+
+
+def test_open_paths_sets_direction_and_scans_once(qtbot, window, model_tree):
+    window.open_paths([model_tree], "decode")
+    assert window.source_page.direction_combo.currentData() == "decode"
+    window.open_paths([model_tree / "missing.drc"], "decode")
+    assert len(window.source_page.state.roots) == 2
+    with qtbot.waitSignal(window.source_page.scanned, timeout=20_000):
+        pass
+
+
+def test_second_launch_forwards_to_the_first(tmp_path):
+    import uuid
+    from pathlib import Path
+
+    from dracoconv.gui.launch import Channel, forward
+
+    address, key = rf"\\.\pipe\dracoconv-test-{uuid.uuid4().hex}", b"test"
+    channel = Channel(address, key)
+    try:
+        assert forward(address, key, "encode", [tmp_path / "a.stl", tmp_path / "b.obj"])
+        assert channel.requests.get(timeout=5) == ("encode", [tmp_path / "a.stl", tmp_path / "b.obj"])
+        assert not forward(address, b"wrong key", "encode", [tmp_path]) or channel.requests.empty()
+    finally:
+        channel.close()
+    assert not forward(rf"\\.\pipe\dracoconv-test-{uuid.uuid4().hex}", key, None, [Path("x")])

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -106,6 +106,10 @@ class SourcePage(QWidget):
         self.remove_button.clicked.connect(self._remove_selected)
         self.scan_button.clicked.connect(self.start_scan)
         self.direction_combo.currentIndexChanged.connect(self._direction_chosen)
+        self._pending_scan = QTimer(self)
+        self._pending_scan.setSingleShot(True)
+        self._pending_scan.setInterval(600)
+        self._pending_scan.timeout.connect(self._scan_when_idle)
         self._apply_direction()
         self.retranslate()
 
@@ -116,6 +120,22 @@ class SourcePage(QWidget):
         if path not in self.state.roots:
             self.state.roots.append(path)
             self.roots_list.addItem(str(path))
+
+    def open_paths(self, paths, direction: str) -> None:
+        """Ajoute des chemins venus de l'Explorateur, règle le sens et relance l'analyse un peu plus tard,
+        pour qu'une sélection de plusieurs fichiers arrivant un par un ne lance qu'une analyse."""
+        index = self.direction_combo.findData(direction)
+        if index >= 0 and index != self.direction_combo.currentIndex():
+            self.direction_combo.setCurrentIndex(index)
+        for path in paths:
+            self.add_root(Path(path))
+        self._pending_scan.start()
+
+    def _scan_when_idle(self) -> None:
+        if self._worker is not None:
+            self._pending_scan.start()
+        else:
+            self.start_scan()
 
     def _pick_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, tr("gui.source.add_folder"))

@@ -95,6 +95,20 @@ class MainWindow(QMainWindow):
         self.steps.setCurrentRow(0)
         self.retranslate()
 
+    def open_paths(self, paths, direction: str | None = None) -> None:
+        """Ouvre des fichiers ou dossiers (clic droit de l'Explorateur) et ramène la fenêtre devant."""
+        from .launch import infer_direction
+
+        paths = list(paths)
+        if not paths:
+            return
+        self.steps.setCurrentRow(0)
+        self.source_page.open_paths(paths, direction or infer_direction(paths))
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _show_step(self, row: int) -> None:
         self.pages.setCurrentIndex(row)
         self.previous_button.setEnabled(row > 0)

@@ -41,11 +41,20 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 fr.AddToPath=Ajouter la ligne de commande dracoconv à la variable PATH
 en.AddToPath=Add the dracoconv command line to PATH
 fr.CommandLine=dracoconv (ligne de commande)
+fr.MenuEncode=Convertir en .drc avec dracoconv
+fr.MenuDecode=Convertir depuis .drc avec dracoconv
+fr.MenuFolder=Convertir avec dracoconv
+fr.ContextMenu=Ajouter « Convertir avec dracoconv » au clic droit de l'Explorateur
 en.CommandLine=dracoconv (command line)
+en.MenuEncode=Convert to .drc with dracoconv
+en.MenuDecode=Convert from .drc with dracoconv
+en.MenuFolder=Convert with dracoconv
+en.ContextMenu=Add "Convert with dracoconv" to the Explorer right-click menu
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "addtopath"; Description: "{cm:AddToPath}"; Flags: unchecked
+Name: "contextmenu"; Description: "{cm:ContextMenu}"
 
 [Files]
 Source: "{#Root}\dist\dracoconv\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -59,6 +68,34 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\dracoconv-gui.exe"; Tasks: de
 
 [Registry]
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NeedsAddPath(ExpandConstant('{app}'))
+
+
+; Clic droit de l'Explorateur (menu classique, « Afficher plus d'options » sous Windows 11). Un processus par
+; fichier sélectionné : le premier ouvre la fenêtre, les suivants lui passent leur chemin (dracoconv/gui/launch.py).
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.stl\shell\dracoconv.encode"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuEncode}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.stl\shell\dracoconv.encode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.stl\shell\dracoconv.encode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.stl\shell\dracoconv.encode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --encode ""%1"""; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.obj\shell\dracoconv.encode"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuEncode}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.obj\shell\dracoconv.encode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.obj\shell\dracoconv.encode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.obj\shell\dracoconv.encode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --encode ""%1"""; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.ply\shell\dracoconv.encode"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuEncode}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.ply\shell\dracoconv.encode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.ply\shell\dracoconv.encode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.ply\shell\dracoconv.encode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --encode ""%1"""; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.3mf\shell\dracoconv.encode"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuEncode}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.3mf\shell\dracoconv.encode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.3mf\shell\dracoconv.encode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.3mf\shell\dracoconv.encode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --encode ""%1"""; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuDecode}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --decode ""%1"""; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuFolder}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" ""%1"""; Tasks: contextmenu
 
 [Run]
 Filename: "{app}\dracoconv-gui.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
