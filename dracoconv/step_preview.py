@@ -10,7 +10,7 @@ import numpy as np
 from dracoconv.preview_rendering import MAX_FACES, MAX_VERTICES, DisplayMesh, prepare_arrays
 
 STEP_TOOL = Path(__file__).resolve().parents[1] / 'windows' / 'preview' / 'build' / 'step' / 'step_mesh.exe'
-MAGIC = b'DCMESH2\0'
+MAGIC = b'DCMESH3\0'
 # L’auxiliaire dispose de 90 s en tout (bridge.cpp) ; on garde de quoi démarrer Qt et dessiner.
 TIMEOUT = 80
 # Un assemblage STEP complet dépasse vite 100 Mo (Rat Rig V-Core 4.1 : 142 Mo, lu en 47 s avec 1,6 Gio).
@@ -30,13 +30,18 @@ def read_mesh_file(path: Path) -> DisplayMesh:
     vertices, faces = (int(n) for n in np.frombuffer(data, '<u4', 2, 8))
     if not 0 < vertices <= MAX_VERTICES or not 0 < faces <= MAX_FACES:
         raise ValueError('Invalid STEP mesh counts')
-    if len(data) != 16 + 15 * vertices + 12 * faces:
+    if len(data) != 16 + 16 * vertices + 12 * faces:
         raise ValueError('Truncated STEP mesh')
     points = np.frombuffer(data, '<f4', vertices * 3, 16).reshape(-1, 3)
     indices = np.frombuffer(data, '<u4', faces * 3, 16 + 12 * vertices).reshape(-1, 3)
     mesh = prepare_arrays(points, indices)
-    # Couleur sRGB de chaque sommet, lue dans le fichier STEP (bleu par défaut pour les faces sans couleur).
-    mesh.colors = np.frombuffer(data, np.uint8, vertices * 3, 16 + 12 * vertices + 12 * faces).reshape(-1, 3).copy()
+    # Couleur sRGB et opacité de chaque sommet, lues dans le fichier STEP (bleu opaque pour les faces sans couleur).
+    mesh.colors = np.frombuffer(data, np.uint8, vertices * 4, 16 + 12 * vertices + 12 * faces).reshape(-1, 4).copy()
+    # Les faces translucides passent en dernier : elles se dessinent par-dessus les faces opaques.
+    translucent = mesh.colors[mesh.faces[:, 0], 3] < 255
+    if translucent.any():
+        mesh.faces = np.ascontiguousarray(mesh.faces[np.argsort(translucent, kind='stable')])
+        mesh.opaque_faces = int(len(translucent) - translucent.sum())
     return mesh
 
 

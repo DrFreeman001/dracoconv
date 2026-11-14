@@ -123,3 +123,13 @@ Essai dans le vrai Explorer sur le Rat Rig V-Core 4.1 500 IDEX (142 Mo), source 
 - relevés pendant l'essai : auxiliaire d'aperçu 944 Mio réservés, lecteur 963 Mio de mémoire vive au pic ; 3 930 Mio réservés au pic, aperçu et miniature cumulés (deux jobs distincts).
 
 **Constaté :** Explorer relance la lecture pour la miniature pendant que l'aperçu est ouvert ; chaque lecture coûte environ 50 s de processeur. Les panneaux du caisson restent opaques (transparence non lue). **Non mesuré :** la marge exacte sous 3 072 Mio dans un seul job, et un fichier proche de 200 Mio.
+
+## 14 novembre 2026 — transparence des vitrages STEP
+
+Constat : le Rat Rig exporté par Fusion ne contient aucune transparence (`SURFACE_STYLE_TRANSPARENT` : 0 occurrence), et aucun STEP de la collection non plus. Fusion écrit en revanche le nom de la matière dans la couleur : `COLOUR_RGB('Polycarbonate (Tinted Black)', ...)`.
+
+Fait : `step_mesh.exe` lit l'opacité standard quand elle existe et, à défaut, rend translucide (opacité 80/255) toute couleur dont le nom contient polycarbonate, acrylic, glass, transparent, translucent, plexi, pmma, clear ou tinted. Format `DCMESH3` (couleur et opacité par sommet). Le rendu dessine les faces opaques, puis les translucides avec mélange et sans écrire la profondeur.
+
+- Rat Rig (142 Mo), hors Explorer : lecteur 50,8 s, 1 616 Mio réservés ; dessin 0,3 s ; la machine est visible à travers les panneaux.
+- Vrai Explorer, volet d'aperçu : même image, machine visible à travers le caisson.
+- **Limites :** deux pièces opaques de la même couleur exacte qu'un vitrage deviendraient translucides aussi. Les faces translucides ne sont pas triées entre elles. La miniature déjà en cache reste opaque jusqu'à son renouvellement. L'opacité standard du format n'a été vérifiée sur aucun fichier réel, faute d'exemple.

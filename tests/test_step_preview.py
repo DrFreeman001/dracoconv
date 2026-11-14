@@ -12,7 +12,7 @@ def write_mesh(path, points, faces, magic=step_preview.MAGIC, counts=None, color
     points = np.asarray(points, np.float32)
     faces = np.asarray(faces, np.uint32)
     counts = counts or (len(points), len(faces))
-    colors = np.full((len(points), 3), 7, np.uint8) if colors is None else np.asarray(colors, np.uint8)
+    colors = np.full((len(points), 4), 255, np.uint8) if colors is None else np.asarray(colors, np.uint8)
     path.write_bytes(magic + np.asarray(counts, '<u4').tobytes() + points.tobytes() + faces.tobytes() + colors.tobytes())
 
 
@@ -78,21 +78,43 @@ def test_invalid_step_is_rejected(tmp_path):
 
 def test_reads_vertex_colors(tmp_path):
     path = tmp_path / 'model.mesh'
-    write_mesh(path, [[0, 0, 0], [2, 0, 0], [0, 4, 0]], [[0, 1, 2]], colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+    write_mesh(path, [[0, 0, 0], [2, 0, 0], [0, 4, 0]], [[0, 1, 2]], colors=[[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]])
     mesh = step_preview.read_mesh_file(path)
-    assert mesh.colors.dtype == np.uint8 and mesh.colors.tolist() == [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+    assert mesh.colors.dtype == np.uint8 and mesh.colors.tolist() == [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]]
+    assert mesh.opaque_faces is None
 
 
 @needs_tool
 def test_uncoloured_step_gets_the_default_colour(tmp_path):
     mesh = step_preview.mesh_step(BLOCK, tmp_path / 'model.mesh')
-    assert {tuple(c) for c in mesh.colors.tolist()} == {(65, 135, 205)}
+    assert {tuple(c) for c in mesh.colors.tolist()} == {(65, 135, 205, 255)}
 
 
 @needs_tool
 def test_face_colour_overrides_solid_colour(tmp_path):
     mesh = step_preview.mesh_step(BLOCK.with_name('colored_block.step'), tmp_path / 'model.mesh')
     colors = {tuple(c) for c in mesh.colors.tolist()}
-    assert colors == {(0, 255, 0), (255, 0, 0)}
+    assert colors == {(0, 255, 0, 255), (255, 0, 0, 255)}
     assert 0 < (mesh.colors[:, 0] == 255).sum() < len(mesh.colors) / 2
 
+
+def test_translucent_faces_are_moved_last(tmp_path):
+    path = tmp_path / 'model.mesh'
+    points = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1]]
+    colors = [[9, 9, 9, 80]] * 3 + [[9, 9, 9, 255]] * 3
+    write_mesh(path, points, [[0, 1, 2], [3, 4, 5]], colors=colors)
+    mesh = step_preview.read_mesh_file(path)
+    assert mesh.faces.tolist() == [[3, 4, 5], [0, 1, 2]] and mesh.opaque_faces == 1
+
+
+@needs_tool
+def test_material_named_like_glazing_becomes_translucent(tmp_path):
+    text = BLOCK.with_name('colored_block.step').read_text(encoding='ascii')
+    assert text.count("COLOUR_RGB('',1.,0.,0.)") == 1
+    source = tmp_path / 'glazed.step'
+    source.write_text(text.replace("COLOUR_RGB('',1.,0.,0.)", "COLOUR_RGB('Polycarbonate (Tinted Black)',1.,0.,0.)"), encoding='ascii')
+    mesh = step_preview.mesh_step(source, tmp_path / 'model.mesh')
+    assert {tuple(c) for c in mesh.colors.tolist()} == {(0, 255, 0, 255), (255, 0, 0, 80)}
+    assert 0 < mesh.opaque_faces < len(mesh.faces)
+    assert (mesh.colors[mesh.faces[:mesh.opaque_faces, 0], 3] == 255).all()
+    assert (mesh.colors[mesh.faces[mesh.opaque_faces:, 0], 3] == 80).all()

@@ -146,3 +146,22 @@ def test_vertex_colours_reach_the_image(request):
     assert images[1].red() > 150 and images[1].green() < 20 and images[1].blue() < 20
     with pytest.raises(ValueError, match='colors'):
         MeshRenderer(DisplayMesh(points, faces, colors=np.zeros((3, 3), np.uint8)))
+
+
+def test_translucent_face_lets_the_opaque_one_show_through(request):
+    if not native_gpu_test(request):
+        return
+    from dracoconv.preview_rendering import DisplayMesh, MeshRenderer
+    square = [[-.4, -.4], [.4, -.4], [.4, .4], [-.4, .4]]
+    points = np.array([[x, y, .3] for x, y in square] + [[x, y, -.3] for x, y in square], np.float32)
+    colors = np.array([[255, 0, 0, 128]] * 4 + [[0, 0, 255, 255]] * 4, np.uint8)
+    # Le carré rouge translucide est devant le carré bleu opaque ; les faces opaques sont listées en premier.
+    faces = np.array([[4, 5, 6], [4, 6, 7], [0, 1, 2], [0, 2, 3]], np.uint32)
+    with MeshRenderer(DisplayMesh(points, faces, colors=colors, opaque_faces=2)) as renderer:
+        pixel = renderer.render(64, 64, yaw=0, pitch=0).pixelColor(32, 32)
+    assert pixel.red() > 60 and pixel.blue() > 60 and pixel.alpha() == 255
+    with MeshRenderer(DisplayMesh(points, faces, colors=colors)) as renderer:
+        opaque = renderer.render(64, 64, yaw=0, pitch=0).pixelColor(32, 32)
+    assert opaque.red() > 150 and opaque.blue() < 20
+    with pytest.raises(ValueError, match='opaque'):
+        MeshRenderer(DisplayMesh(points, faces, colors=colors, opaque_faces=5))

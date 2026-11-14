@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import DracoPy
 from shiboken6 import VoidPtr
-from PySide6.QtGui import QOffscreenSurface, QOpenGLContext, QSurfaceFormat, QMatrix4x4, QVector3D
+from PySide6.QtGui import QOffscreenSurface, QOpenGLContext, QSurfaceFormat, QMatrix4x4, QVector4D
 from PySide6.QtOpenGL import QOpenGLBuffer, QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLFramebufferObjectFormat
 
 MAX_INPUT = 64 * 1024 * 1024
@@ -21,7 +21,8 @@ class DisplayMesh:
     positions: np.ndarray
     faces: np.ndarray
     simplified: bool = False
-    colors: np.ndarray | None = None  # uint8 (sommets, 3), sRGB ; None : couleur par défaut
+    colors: np.ndarray | None = None  # uint8 (sommets, 3 ou 4), sRGB et opacité ; None : couleur par défaut
+    opaque_faces: int | None = None  # les faces suivantes sont translucides ; None : toutes opaques
 
 
 def prepare_arrays(points, faces):
@@ -61,8 +62,8 @@ def decode_mesh(data):
 
 _VERTEX = '''#version 120
 attribute vec3 position;
-attribute vec3 color;
-varying vec3 surfaceColor;
+attribute vec4 color;
+varying vec4 surfaceColor;
 uniform mat4 rotation;
 uniform mat4 projection;
 varying vec3 surfacePosition;
@@ -75,11 +76,11 @@ void main() {
 '''
 _FRAGMENT = '''#version 120
 varying vec3 surfacePosition;
-varying vec3 surfaceColor;
+varying vec4 surfaceColor;
 void main() {
     vec3 n = normalize(cross(dFdx(surfacePosition), dFdy(surfacePosition)));
     float light = 0.35 + 0.65 * abs(dot(n, normalize(vec3(-0.35,0.5,1.0))));
-    gl_FragColor = vec4(surfaceColor*light, 1.0);
+    gl_FragColor = vec4(surfaceColor.rgb*light, surfaceColor.a);
 }
 '''
 
@@ -120,7 +121,8 @@ class MeshRenderer:
             if not self.program.link():
                 raise RuntimeError('OpenGL program unavailable: ' + self.program.log())
             colors = getattr(mesh, 'colors', None)
-            if colors is not None and (colors.dtype != np.uint8 or colors.shape != mesh.positions.shape):
+            if colors is not None and (colors.dtype != np.uint8 or colors.ndim != 2 or len(colors) != len(mesh.positions)
+                                       or colors.shape[1] not in (3, 4)):
                 raise ValueError('Invalid vertex colors')
             self.colored = colors is not None
             arrays = [(QOpenGLBuffer.Type.VertexBuffer, mesh.positions), (QOpenGLBuffer.Type.IndexBuffer, mesh.faces)]
@@ -136,6 +138,11 @@ class MeshRenderer:
                 if self.gl.glGetError():
                     raise RuntimeError('OpenGL mesh allocation failed')
             self.count = int(mesh.faces.size)
+            opaque = getattr(mesh, 'opaque_faces', None)
+            if opaque is not None and not 0 <= opaque <= len(mesh.faces):
+                raise ValueError('Invalid opaque face count')
+            self.opaque = self.count if opaque is None else int(opaque) * 3
+            self.components = colors.shape[1] if self.colored else 4
         except Exception:
             self.close()
             raise
@@ -172,10 +179,10 @@ class MeshRenderer:
             if self.colored:
                 self.buffers[2].bind()
                 self.program.enableAttributeArray(1)
-                self.program.setAttributeBuffer(1, 0x1401, 0, 3, 3)  # octets non signés, normalisés par Qt
+                self.program.setAttributeBuffer(1, 0x1401, 0, self.components, self.components)  # octets non signés, normalisés par Qt
             else:
                 self.program.disableAttributeArray(1)
-                self.program.setAttributeValue(1, QVector3D(*DEFAULT_COLOR))
+                self.program.setAttributeValue(1, QVector4D(*DEFAULT_COLOR, 1.))
             self.buffers[1].bind()
             rotation = QMatrix4x4()
             rotation.rotate(float(pitch), 1, 0, 0)
@@ -188,7 +195,18 @@ class MeshRenderer:
             projection.ortho(-extent*width/min(width,height), extent*width/min(width,height), -extent*height/min(width,height), extent*height/min(width,height), -10, 10)
             self.program.setUniformValue('rotation', rotation)
             self.program.setUniformValue('projection', projection)
-            gl.glDrawElements(0x0004, self.count, 0x1405, VoidPtr(0))
+            gl.glDisable(0x0BE2)  # mélange
+            gl.glDepthMask(True)
+            if self.opaque:
+                gl.glDrawElements(0x0004, self.opaque, 0x1405, VoidPtr(0))
+            if self.opaque < self.count:
+                # Faces translucides : après les opaques, sans écrire la profondeur ; l'alpha de l'image reste à 1.
+                gl.glEnable(0x0BE2)
+                gl.glBlendFuncSeparate(0x0302, 0x0303, 0, 1)
+                gl.glDepthMask(False)
+                gl.glDrawElements(0x0004, self.count - self.opaque, 0x1405, VoidPtr(self.opaque * 4))
+                gl.glDepthMask(True)
+                gl.glDisable(0x0BE2)
             if gl.glGetError():
                 raise RuntimeError('OpenGL draw failed')
             image = self.fbo.toImage()
