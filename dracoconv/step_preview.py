@@ -5,7 +5,11 @@ job Windows. Il écrit un maillage compact que l'on relit et vérifie ici.
 """
 from __future__ import annotations
 from pathlib import Path
+import hashlib
+import os
+import re
 import subprocess
+import time
 import numpy as np
 from dracoconv.preview_rendering import MAX_FACES, MAX_VERTICES, DisplayMesh, prepare_arrays
 
@@ -17,6 +21,44 @@ TIMEOUT = 80
 MAX_INPUT = 200 * 1024 * 1024
 _ERRORS = {2: 'Invalid STEP input', 3: 'STEP file has no surfaces', 4: 'STEP model exceeds preview limit',
            5: 'Cannot write STEP mesh', 6: 'STEP reader failed'}
+
+
+# Explorer demande la miniature et l'aperçu séparément : sans cache, un gros assemblage est lu deux fois de suite.
+# Le maillage d'une lecture longue est donc gardé un court moment, sous l'empreinte du contenu du fichier.
+CACHE_MIN_SECONDS = 5
+CACHE_SECONDS = 3600
+CACHE_ENTRIES = 2
+_CACHED = re.compile(r'[0-9a-f]{64}\.mesh')
+
+
+def _cache_dir(output: Path) -> Path | None:
+    """Dossier du cache, seulement quand output est dans un dossier temporaire de l'aperçu."""
+    base = output.parent.parent
+    return base / 'mesh-cache' if base.name == 'DracoConvPreview' else None
+
+
+def _digest(source: Path) -> str:
+    digest = hashlib.sha256()
+    with open(source, 'rb') as stream:
+        while block := stream.read(1 << 20):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def prune_cache(cache: Path, now: float | None = None) -> None:
+    """Retire les maillages de plus de CACHE_SECONDS et ne garde que les CACHE_ENTRIES plus récents."""
+    now = time.time() if now is None else now
+    try:
+        entries = [p for p in cache.iterdir() if _CACHED.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
+    except OSError:
+        return
+    entries.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for rank, entry in enumerate(entries):
+        if rank >= CACHE_ENTRIES or now - entry.stat().st_mtime > CACHE_SECONDS:
+            try:
+                entry.unlink()
+            except OSError:
+                pass
 
 
 def is_step(head: bytes) -> bool:
@@ -50,12 +92,29 @@ def mesh_step(source: Path, output: Path, tool: Path = STEP_TOOL, timeout: float
     tool, output = Path(tool), Path(output)
     if not tool.exists():
         raise ValueError('STEP reader is not installed')
+    cache, entry = _cache_dir(output), None
+    if cache is not None:
+        prune_cache(cache)
+        entry = cache / (_digest(source) + '.mesh')
+        if entry.is_file() and not entry.is_symlink():
+            try:
+                return read_mesh_file(entry)
+            except (OSError, ValueError):
+                entry.unlink(missing_ok=True)
+    started = time.monotonic()
     try:
         result = subprocess.run([str(tool), str(source), str(output)], capture_output=True, timeout=timeout,
                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
             raise ValueError(_ERRORS.get(result.returncode, f'STEP reader failed ({result.returncode})'))
-        return read_mesh_file(output)
+        mesh = read_mesh_file(output)
+        if entry is not None and time.monotonic() - started >= CACHE_MIN_SECONDS:
+            try:
+                cache.mkdir(exist_ok=True)
+                os.replace(output, entry)
+            except OSError:
+                pass
+        return mesh
     except subprocess.TimeoutExpired as exc:
         raise ValueError('STEP reading took too long') from exc
     finally:

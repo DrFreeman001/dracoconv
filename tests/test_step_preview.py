@@ -1,3 +1,5 @@
+import os
+import sys
 from pathlib import Path
 import shutil
 import numpy as np
@@ -118,3 +120,46 @@ def test_material_named_like_glazing_becomes_translucent(tmp_path):
     assert 0 < mesh.opaque_faces < len(mesh.faces)
     assert (mesh.colors[mesh.faces[:mesh.opaque_faces, 0], 3] == 255).all()
     assert (mesh.colors[mesh.faces[mesh.opaque_faces:, 0], 3] == 80).all()
+
+
+def test_cache_is_only_used_inside_a_preview_job(tmp_path):
+    job = tmp_path / 'DracoConvPreview' / '{12345678-1234-1234-1234-123456789ABC}'
+    assert step_preview._cache_dir(job / 'model.mesh') == tmp_path / 'DracoConvPreview' / 'mesh-cache'
+    assert step_preview._cache_dir(tmp_path / 'model.mesh') is None
+
+
+def test_cache_keeps_few_recent_meshes(tmp_path):
+    names = ['%064x.mesh' % i for i in range(4)]
+    for age, name in enumerate(names):
+        (tmp_path / name).write_bytes(b'x')
+        os.utime(tmp_path / name, (1000 - age, 1000 - age))
+    (tmp_path / 'other.txt').write_bytes(b'kept')
+    step_preview.prune_cache(tmp_path, now=1001)
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(names[:2] + ['other.txt'])
+    step_preview.prune_cache(tmp_path, now=1001 + step_preview.CACHE_SECONDS)
+    assert [p.name for p in tmp_path.iterdir()] == ['other.txt']
+
+
+@needs_tool
+def test_second_reading_of_a_slow_file_comes_from_the_cache(tmp_path, monkeypatch):
+    job = tmp_path / 'DracoConvPreview' / '{12345678-1234-1234-1234-123456789ABC}'
+    job.mkdir(parents=True)
+    monkeypatch.setattr(step_preview, 'CACHE_MIN_SECONDS', 0)
+    first = step_preview.mesh_step(BLOCK, job / 'model.mesh')
+    cached = list((tmp_path / 'DracoConvPreview' / 'mesh-cache').iterdir())
+    assert len(cached) == 1 and not (job / 'model.mesh').exists()
+    # Un outil qui échouerait à coup sûr : le résultat ne peut venir que du cache.
+    again = step_preview.mesh_step(BLOCK, job / 'model.mesh', tool=Path(sys.executable))
+    assert np.array_equal(first.faces, again.faces) and np.array_equal(first.colors, again.colors)
+    cached[0].write_bytes(b'corrupt')
+    with pytest.raises(ValueError):
+        step_preview.mesh_step(BLOCK, job / 'model.mesh', tool=Path(sys.executable))
+    assert not cached[0].exists()
+
+
+@needs_tool
+def test_fast_readings_are_not_cached(tmp_path):
+    job = tmp_path / 'DracoConvPreview' / '{12345678-1234-1234-1234-123456789ABC}'
+    job.mkdir(parents=True)
+    step_preview.mesh_step(BLOCK, job / 'model.mesh')
+    assert not (tmp_path / 'DracoConvPreview' / 'mesh-cache').exists()

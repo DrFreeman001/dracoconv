@@ -148,3 +148,11 @@ Fait : `step_mesh.exe` lit l'opacité standard quand elle existe et, à défaut,
 - `probe.exe` : miniature et déchargement réussis ; `cache_probe.exe` sur un STEP neuf : miniature fournie par Windows (HRESULT 0).
 - Plantage simulé : `preview_probe.exe` (qui héberge la DLL) tué pendant un aperçu ouvert. Le dossier reste, avec `events.log`, `input.drc`, `lease.v1` et `ready` ; l'auxiliaire est bien arrêté par le job. Au lancement suivant (`probe.exe`), le dossier abandonné a disparu : 0 dossier restant.
 - Non refait : le contrôle à l'œil du volet d'aperçu après ce changement, et un plantage de `prevhost.exe` lui-même (interdit tant qu'Explorer tourne).
+
+## 14 novembre 2026 — cache court du maillage STEP
+
+Explorer demande la miniature et l'aperçu séparément : le Rat Rig (142 Mo) était lu deux fois, environ 50 s et 1,6 Gio chaque fois. Le maillage d'une lecture de plus de 5 s est maintenant gardé une heure au plus (deux entrées au maximum), sous l'empreinte SHA-256 du contenu.
+
+- Mesuré avec l'auxiliaire, dans un dossier d'essai : première miniature par lecture complète, la suivante en 0,9 s, images identiques octet pour octet ; un maillage de 94 Mio en cache.
+- Un cache corrompu est rejeté et supprimé (testé). Les lectures rapides ne sont pas mises en cache (testé).
+- **À savoir :** ce cache laisse, pendant une heure au plus, une copie de la géométrie dans le profil de l'utilisateur, alors qu'auparavant tout disparaissait à la fermeture. Il est purgé au lancement suivant d'un aperçu STEP, pas par une horloge. Non vérifié dans le vrai Explorer, ni quand miniature et aperçu démarrent en même temps (les deux lisent alors le fichier).
