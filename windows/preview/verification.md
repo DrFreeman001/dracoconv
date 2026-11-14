@@ -76,3 +76,18 @@ Mesuré hors Explorer, sources lues seulement (SHA-256 inchangés) :
 - Images contrôlées à l'œil : châssis gris et carte électronique de The 100, carte EBB42 noire avec bornier vert et entretoises dorées, engrenage PETmachine blanc.
 
 **Non refait :** l'essai dans le vrai Explorer en faible intégrité. La DLL n'a pas changé ; l'auxiliaire et `step_mesh.exe` sont relus à chaque aperçu. Les miniatures déjà en cache restent bleues jusqu'à leur renouvellement.
+
+## 14 novembre 2026 — gros fichiers STEP : où part le temps
+
+Essai avec un `step_mesh.exe` instrumenté (retiré ensuite), sources lues seulement :
+
+| Fichier | Lecture | Conversion STEP → formes | Maillage | Triangles |
+|---|---|---|---|---|
+| The 100 (33 Mo), flèche 0,1 % | 1,0 s | 6,0 s | 1,6 s | 466 253 |
+| The 100, flèche 1 % | 1,0 s | 6,2 s | 1,6 s | 367 535 |
+| Carte EBB42 (29 Mo), flèche 0,1 % | 0,8 s | 3,5 s | 1,5 s | 545 680 |
+| Carte EBB42, flèche 1 % | 0,8 s | 3,5 s | 1,5 s | 270 078 |
+
+- Un maillage dix fois plus grossier ne gagne aucun temps : la conversion domine et ne dépend pas de la finesse. Idée abandonnée.
+- Couper la réparation des formes d'OpenCascade (`SetShapeProcessFlags` vide) ne change rien non plus : 6,1 s et 3,5 s, mêmes triangles.
+- Le seul levier restant est le délai : 16 s côté Python, 20 s dans `bridge.cpp`. Un fichier deux fois plus gros que The 100 demanderait environ 18 s de lecteur et dépasserait. Non modifié : il faut recompiler la DLL et redémarrer Explorer. Aucun fichier de la collection ne dépasse 33 Mo.
