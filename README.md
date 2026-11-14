@@ -25,7 +25,7 @@ Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'o
 Windows, Python 3.11 ou plus récent.
 
 ```bash
-git clone <adresse du dépôt> dracoconv
+git clone https://github.com/DrFreeman001/dracoconv.git dracoconv
 ```
 
 ```bash

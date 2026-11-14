@@ -1,0 +1,11 @@
+# Versions exactes avec lesquelles la suite de tests passe (Python 3.14, Windows 11, 14 novembre 2026).
+DracoPy==2.2.0
+lxml==6.1.3
+networkx==3.7
+numpy==2.5.4
+PySide6==6.12.0
+scipy==1.18.1
+Send2Trash==2.1.0
+trimesh==5.2.0
+pytest==9.2.0
+pytest-qt==4.5.0

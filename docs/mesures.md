@@ -89,7 +89,7 @@ Commande utilisée, en lecture seule sur les originaux :
 .venv/Scripts/python tools/calibrate.py '<collection>' --budget 3600 --out dracoconv/data/ratios.json
 ```
 
-Journal local : `.superpowers/validation-2026-11-11/calibration-nas.log`. La première calibration locale portait sur 7623 fichiers (dont deux STL reconstruits lors des contrôles) et utilisait des échantillons partiels différents. Sa reprise a été abandonnée lorsque seuls 341 fichiers admissibles restaient. L'utilisateur a confirmé avoir converti les originaux locaux ; les mesures NAS ci-dessus remplacent désormais les anciens ratios STL/OBJ partiels.
+Journal local (non publié) : `.superpowers/validation-2026-11-11/calibration-nas.log`. La première calibration locale portait sur 7623 fichiers (dont deux STL reconstruits lors des contrôles) et utilisait des échantillons partiels différents. Sa reprise a été abandonnée lorsque seuls 341 fichiers admissibles restaient. L'utilisateur a confirmé avoir converti les originaux locaux ; les mesures NAS ci-dessus remplacent désormais les anciens ratios STL/OBJ partiels.
 
 ## 4. Limites mesurées des moteurs
 

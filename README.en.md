@@ -25,7 +25,7 @@ Built to archive a collection of 3D-printing models: the `.drc` files open in Or
 Windows, Python 3.11 or newer.
 
 ```bash
-git clone <repository address> dracoconv
+git clone https://github.com/DrFreeman001/dracoconv.git dracoconv
 ```
 
 ```bash

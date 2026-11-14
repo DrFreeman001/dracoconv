@@ -8,17 +8,30 @@ version = "0.1.0"
 description = "Convertisseur Draco (.drc) pour modèles 3D : STL, OBJ, PLY, 3MF, ZIP — dans les deux sens, par lots"
 readme = "README.md"
 license = { text = "Apache-2.0" }
+authors = [{ name = "DrFreeman001" }]
+keywords = ["draco", "stl", "3d-printing", "mesh", "compression"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
 requires-python = ">=3.11"
 dependencies = [
-    "numpy",
-    "scipy",
-    "trimesh",
-    "networkx",
-    "lxml",
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "trimesh>=4.0",
+    "networkx>=3.0",
+    "lxml>=5.0",
     "DracoPy>=2.0",
     "PySide6>=6.8",
-    "send2trash",
+    "send2trash>=1.8",
 ]
+
+[project.urls]
+Homepage = "https://github.com/DrFreeman001/dracoconv"
+Issues = "https://github.com/DrFreeman001/dracoconv/issues"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-qt", "cmake"]

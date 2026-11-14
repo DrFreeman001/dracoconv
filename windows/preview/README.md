@@ -32,4 +32,4 @@ STEP : le format est reconnu au contenu (`ISO-10303-21`), pas au nom. L’auxili
 
 `inspect_integrity.py PID...` relève les niveaux d’intégrité sans modifier les processus. Les entrées temporaires sont privées au profil utilisateur sous LocalLow/DracoConvPreview et supprimées au déchargement normal. Une interruption brutale de l’hôte peut laisser un dossier temporaire ; une collecte de ces restes reste à implémenter avant distribution.
 
-État final du contrôle : prototype désinstallé. Le parcours Tab/Shift+Tab reste non validé dans Explorer ; voir le compte rendu. Ne pas laisser cette version activée pour un usage quotidien.
+État au 13 novembre 2026 : extension validée dans Explorer pour `.drc`, `.step` et `.stp` (voir [verification.md](verification.md)). Elle reste un prototype : les chemins de `build/preview.ini` sont propres à cette copie du dépôt, il n’y a pas d’installateur, et le parcours Tab/Maj+Tab ne fonctionne pas.
