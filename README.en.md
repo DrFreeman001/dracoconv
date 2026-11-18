@@ -94,6 +94,8 @@ Five steps:
 
 **Duplicates**: "Tools" menu, "Find duplicates…" (or `dracoconv duplicates folders... [--csv file.csv]`). Finds identical files, and the same model in another form: an STL and its `.drc`, or `.drc` files made with other settings or an older dracoconv. The comparison uses the geometry (triangles, size, area, volume, spread of the surface), with a tolerance that covers Draco's rounding; a model that was only moved is still a duplicate, a variant with a moved detail is not. Nothing is deleted without confirmation: checked files go to the Recycle Bin, and at least one file per group stays. Measurements are cached, so a second search is almost instant. ZIP files are not opened.
 
+**Watched folders**: "Tools" menu, "Watched folders…". dracoconv converts new models in these folders on its own (for example "Downloads"), with no program running all the time: a Windows Task Scheduler task starts it at sign-in and then every 15 minutes, hours or days; it converts what is new and exits. A single process at low priority, no run on battery; a file changed less than five minutes ago waits for the next run. Originals are kept, or sent to the Recycle Bin after checking if you confirm it. A Windows notification sums up each run that converted something.
+
 **Drag and drop**: files or folders dropped on the window are added as with "Add". During a batch, the taskbar icon shows the progress, and a Windows notification reports the end when the window is not in front.
 
 The **Help** menu links to the project page and controls the new-version notice: at most one check a day on GitHub, sending nothing but the request; uncheck it to stop.

@@ -6,18 +6,23 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
-    """dracoconv-gui [--encode|--decode|--slicer] [chemins...]"""
+    """dracoconv-gui [--encode|--decode|--slicer|--watch] [chemins...]"""
     multiprocessing.freeze_support()
     from .launch import claim_or_forward, parse
 
     direction, paths = parse(sys.argv[1:] if argv is None else argv)
-    if direction == "slicer":
+    if direction in ("slicer", "watch"):
         from ..config import load_prefs
         from ..i18n import LANGUAGES, set_language, system_language
-        from .slicer_open import run
 
         language = load_prefs().get("language")
         set_language(language if language in LANGUAGES else system_language())
+        if direction == "watch":  # passage de la tâche planifiée « dossiers surveillés »
+            from .watch_run import run as watch_run
+
+            return watch_run()
+        from .slicer_open import run
+
         return run(paths)
     channel = claim_or_forward(direction, paths)
     if channel is True:  # une fenêtre déjà ouverte a reçu les chemins

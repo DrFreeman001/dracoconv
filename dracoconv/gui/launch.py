@@ -25,7 +25,7 @@ def parse(argv: list[str]) -> tuple[str | None, list[Path]]:
     """Lit « [--encode|--decode|--slicer] chemins... » ; le sens est None s'il n'est pas donné."""
     direction, paths = None, []
     for arg in argv:
-        if arg in ("--encode", "--decode", "--slicer"):
+        if arg in ("--encode", "--decode", "--slicer", "--watch"):
             direction = arg[2:]
         elif arg:
             paths.append(Path(arg))

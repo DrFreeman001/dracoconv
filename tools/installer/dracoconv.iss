@@ -108,6 +108,10 @@ Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv\command"; ValueTy
 [Run]
 Filename: "{app}\dracoconv-gui.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; Tâche planifiée des dossiers surveillés (dracoconv/watch.py), si l'utilisateur l'a activée.
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN dracoconv-surveillance /F"; RunOnceId: "RemoveWatchTask"; Flags: runhidden
+
 [Code]
 function PathContains(const Paths, Dir: string): Boolean;
 begin

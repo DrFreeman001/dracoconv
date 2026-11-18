@@ -108,6 +108,9 @@ class MainWindow(QMainWindow):
         self.duplicates_action = QAction("", self)
         self.duplicates_action.triggered.connect(self.show_duplicates)
         self.tools_menu.addAction(self.duplicates_action)
+        self.watch_action = QAction("", self)
+        self.watch_action.triggered.connect(self.show_watch)
+        self.tools_menu.addAction(self.watch_action)
 
         # Trancheur utilisé par le clic droit « Ouvrir dans le trancheur » sur les .drc.
         self.slicer_menu = self.menuBar().addMenu("")
@@ -192,6 +195,15 @@ class MainWindow(QMainWindow):
         from .duplicates_dialog import DuplicatesDialog
 
         dialog = DuplicatesDialog(list(self.state.roots), self.convert_page.workers_spin.value(), self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.show()
+        return dialog
+
+    def show_watch(self):
+        """Fenêtre « Dossiers surveillés »."""
+        from .watch_dialog import WatchDialog
+
+        dialog = WatchDialog(self)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.show()
         return dialog
@@ -348,6 +360,7 @@ class MainWindow(QMainWindow):
         self.slicer_menu.setTitle(tr("gui.menu.slicer"))
         self.tools_menu.setTitle(tr("gui.menu.tools"))
         self.duplicates_action.setText(tr("gui.dupes.action"))
+        self.watch_action.setText(tr("gui.watch.action"))
         self.updates_action.setText(tr("gui.update.check"))
         self.project_action.setText(tr("gui.update.project"))
         self.theme_menu.setTitle(tr("gui.menu.theme"))
