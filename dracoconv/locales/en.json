@@ -226,7 +226,7 @@
   "gui.source.direction": "Direction",
   "gui.source.encode": "To Draco (.drc)",
   "gui.source.decode": "From Draco (.drc)",
-  "gui.source.roots": "Files, folders or drives to process",
+  "gui.source.roots": "Files, folders or drives to process (you can also drop them on the window)",
   "gui.source.add_folder": "Add a folder…",
   "gui.source.add_files": "Add files…",
   "gui.source.remove": "Remove",

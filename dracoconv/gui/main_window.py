@@ -1,6 +1,8 @@
 """Fenêtre principale : cinq étapes, changement de langue sans redémarrage."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtWidgets import (
@@ -130,6 +132,31 @@ class MainWindow(QMainWindow):
 
         self.steps.setCurrentRow(0)
         self.retranslate()
+        # Glisser-déposer : fichiers et dossiers lâchés n'importe où sur la fenêtre, comme le clic droit.
+        self.setAcceptDrops(True)
+
+    @staticmethod
+    def _dropped_paths(mime) -> list[Path]:
+        if not mime.hasUrls():
+            return []
+        return [Path(url.toLocalFile()) for url in mime.urls() if url.isLocalFile() and url.toLocalFile()]
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802 - API Qt
+        if self._dropped_paths(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event) -> None:  # noqa: N802 - API Qt
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:  # noqa: N802 - API Qt
+        paths = self._dropped_paths(event.mimeData())
+        if not paths:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self.open_paths(paths)
 
     def open_paths(self, paths, direction: str | None = None) -> None:
         """Ouvre des fichiers ou dossiers (clic droit de l'Explorateur) et ramène la fenêtre devant."""

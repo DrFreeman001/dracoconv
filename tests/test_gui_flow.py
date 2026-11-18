@@ -254,6 +254,29 @@ def test_open_paths_sets_direction_and_scans_once(qtbot, window, model_tree):
         pass
 
 
+def test_drop_on_window_adds_paths(qtbot, window, model_tree):
+    from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl
+    from PySide6.QtGui import QDropEvent
+
+    def drop(mime):
+        event = QDropEvent(QPointF(10, 10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier)
+        window.dropEvent(event)
+        return event.isAccepted()
+
+    text_only = QMimeData()
+    text_only.setText("pas un fichier")
+    assert not drop(text_only)
+    assert window.source_page.state.roots == []
+
+    files = QMimeData()
+    files.setUrls([QUrl.fromLocalFile(str(model_tree)), QUrl("https://example.com/x.stl")])
+    assert drop(files)
+    assert len(window.source_page.state.roots) == 1
+    with qtbot.waitSignal(window.source_page.scanned, timeout=20_000):
+        pass
+
+
 def test_second_launch_forwards_to_the_first(tmp_path):
     import uuid
     from pathlib import Path

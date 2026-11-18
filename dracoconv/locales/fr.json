@@ -226,7 +226,7 @@
   "gui.source.direction": "Sens de conversion",
   "gui.source.encode": "Vers Draco (.drc)",
   "gui.source.decode": "Depuis Draco (.drc)",
-  "gui.source.roots": "Fichiers, dossiers ou disques à traiter",
+  "gui.source.roots": "Fichiers, dossiers ou disques à traiter (vous pouvez aussi les glisser sur la fenêtre)",
   "gui.source.add_folder": "Ajouter un dossier…",
   "gui.source.add_files": "Ajouter des fichiers…",
   "gui.source.remove": "Retirer",
