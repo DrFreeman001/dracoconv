@@ -131,6 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name", nargs="?", help=tr("cli.arg.param"))
     p.add_argument("--json", action="store_true", help=tr("cli.opt.json"))
 
+    p = commands.add_parser("duplicates", help=tr("cli.cmd.duplicates"), description=tr("cli.cmd.duplicates"))
+    _add_scan_options(p)
+    p.add_argument("--workers", type=int, help=tr("cli.opt.workers"))
+    p.add_argument("--csv", type=Path, help=tr("cli.opt.duplicates_csv"))
+
     commands.add_parser("gui", help=tr("cli.cmd.gui"), description=tr("cli.cmd.gui"))
     return parser
 
@@ -450,6 +455,48 @@ def cmd_params(args) -> int:
     return EXIT_OK
 
 
+def cmd_duplicates(args) -> int:
+    from .batch import BatchOptions
+    from .duplicates import KINDS, find_duplicates, write_csv
+
+    inv = _scan(args, frozenset(KINDS | {FileKind.ZIP}))
+    workers = args.workers or BatchOptions().resolved_workers()
+
+    def progress(done: int, total: int) -> None:
+        if not args.json and sys.stderr.isatty():
+            print(f"\r{tr('cli.duplicates.progress', done=done, total=total)}", end="", file=sys.stderr, flush=True)
+
+    report = find_duplicates(inv.entries, workers=workers, on_progress=progress)
+    if not args.json and sys.stderr.isatty():
+        print(file=sys.stderr)
+    if args.csv:
+        write_csv(report, args.csv)
+    if args.json:
+        _emit({
+            "examined": report.examined, "skipped_zips": report.skipped_zips,
+            "recoverable_bytes": report.recoverable,
+            "groups": [{"identical": g.identical, "recoverable_bytes": g.recoverable,
+                        "files": [{"path": str(e.path), "kind": e.kind.value, "size": e.size} for e in g.files]}
+                       for g in report.groups],
+            "failed": {str(p): r for p, r in report.failed},
+        })
+        return EXIT_OK
+    print(tr("cli.duplicates.summary", files=report.examined, groups=len(report.groups),
+             size=format_size(report.recoverable)))
+    for number, group in enumerate(report.groups, 1):
+        kind = tr("cli.duplicates.identical" if group.identical else "cli.duplicates.same_model")
+        print(f"\n{tr('cli.duplicates.group', n=number, kind=kind, size=format_size(group.recoverable))}")
+        for entry in group.files:
+            print(f"  {format_size(entry.size):>10}  {entry.path}")
+    if report.skipped_zips:
+        print("\n" + tr("cli.duplicates.zips", n=report.skipped_zips))
+    from .i18n import reason_text
+
+    for path, reason in report.failed:
+        print(f"{tr('cli.ignored')} : {path} ({reason_text(reason)})")
+    return EXIT_OK
+
+
 def cmd_gui(args) -> int:
     from .gui.app import main as gui_main
 
@@ -458,7 +505,7 @@ def cmd_gui(args) -> int:
 
 _COMMANDS = {
     "scan": cmd_scan, "estimate": cmd_estimate, "quality": cmd_quality, "encode": cmd_encode,
-    "decode": cmd_decode, "params": cmd_params, "gui": cmd_gui,
+    "decode": cmd_decode, "params": cmd_params, "duplicates": cmd_duplicates, "gui": cmd_gui,
 }
 
 

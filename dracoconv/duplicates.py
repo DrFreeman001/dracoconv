@@ -83,6 +83,19 @@ class DuplicateReport:
         return sum(g.recoverable for g in self.groups)
 
 
+def write_csv(report: DuplicateReport, path: Path) -> None:
+    """Un fichier par ligne : groupe, sorte de doublon, chemin, format, taille."""
+    import csv
+
+    with open(long_path(path), "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["group", "identical", "path", "kind", "size", "group_recoverable"])
+        for number, group in enumerate(report.groups, 1):
+            for entry in group.files:
+                writer.writerow([number, int(group.identical), str(entry.path), entry.kind.value, entry.size,
+                                 group.recoverable])
+
+
 def _read_mesh(kind: FileKind, data: bytes):
     if kind is FileKind.DRC:
         from .engine import decoder

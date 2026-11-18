@@ -92,6 +92,8 @@ Five steps:
 
 **Open a .drc in your slicer**: Bambu Studio, OrcaSlicer and PrusaSlicer cannot read Draco. Right-click one or more `.drc` files, "Open in slicer": dracoconv decodes them to temporary STL files (checked, deleted after two days) and opens the whole selection in a single slicer window. Pick the slicer in dracoconv's "Slicer" menu; by default, the first one found. Command line: `dracoconv-gui --slicer files.drc...`.
 
+**Duplicates**: "Tools" menu, "Find duplicates…" (or `dracoconv duplicates folders... [--csv file.csv]`). Finds identical files, and the same model in another form: an STL and its `.drc`, or `.drc` files made with other settings or an older dracoconv. The comparison uses the geometry (triangles, size, area, volume, spread of the surface), with a tolerance that covers Draco's rounding; a model that was only moved is still a duplicate, a variant with a moved detail is not. Nothing is deleted without confirmation: checked files go to the Recycle Bin, and at least one file per group stays. Measurements are cached, so a second search is almost instant. ZIP files are not opened.
+
 **Drag and drop**: files or folders dropped on the window are added as with "Add". During a batch, the taskbar icon shows the progress, and a Windows notification reports the end when the window is not in front.
 
 The **Help** menu links to the project page and controls the new-version notice: at most one check a day on GitHub, sending nothing but the request; uncheck it to stop.

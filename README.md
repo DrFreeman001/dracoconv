@@ -92,6 +92,8 @@ Cinq étapes :
 
 **Ouvrir un .drc dans le trancheur** : Bambu Studio, OrcaSlicer et PrusaSlicer ne lisent pas le Draco. Clic droit sur un ou plusieurs `.drc`, « Ouvrir dans le trancheur » : dracoconv les décode en STL temporaires (vérifiés, effacés après deux jours) et ouvre toute la sélection dans une seule fenêtre du trancheur. Le trancheur se choisit dans le menu « Trancheur » de dracoconv ; par défaut, le premier trouvé. Ligne de commande : `dracoconv-gui --slicer fichiers.drc...`.
 
+**Doublons** : menu « Outils », « Chercher les doublons… » (ou `dracoconv duplicates dossiers... [--csv fichier.csv]`). Trouve les fichiers identiques, et le même modèle sous une autre forme : un STL et son `.drc`, ou des `.drc` faits avec d'autres réglages ou une ancienne version de dracoconv. La comparaison porte sur la géométrie (triangles, dimensions, surface, volume, répartition de la matière), avec une tolérance qui couvre l'arrondi de Draco ; un modèle seulement déplacé reste un doublon, une variante avec un détail déplacé n'en est pas un. Rien n'est supprimé sans confirmation : les fichiers cochés partent à la corbeille, au moins un fichier par groupe reste en place. Les mesures sont gardées en cache, une seconde recherche est presque immédiate. Les ZIP ne sont pas ouverts.
+
 **Glisser-déposer** : des fichiers ou dossiers lâchés sur la fenêtre sont ajoutés comme avec « Ajouter ». Pendant un lot, l'icône de la barre des tâches montre l'avancement, et une notification Windows signale la fin si la fenêtre n'est pas au premier plan.
 
 Le menu **Aide** mène à la page du projet et règle l'avis de nouvelle version : au plus une vérification par jour sur GitHub, sans rien envoyer d'autre que la requête ; décochez-le pour ne plus rien demander.

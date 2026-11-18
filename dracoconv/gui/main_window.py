@@ -104,6 +104,11 @@ class MainWindow(QMainWindow):
         QApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self.set_theme(load_prefs().get("theme", "system"), persist=False)
 
+        self.tools_menu = self.menuBar().addMenu("")
+        self.duplicates_action = QAction("", self)
+        self.duplicates_action.triggered.connect(self.show_duplicates)
+        self.tools_menu.addAction(self.duplicates_action)
+
         # Trancheur utilisé par le clic droit « Ouvrir dans le trancheur » sur les .drc.
         self.slicer_menu = self.menuBar().addMenu("")
         self.slicer_menu.aboutToShow.connect(self._fill_slicer_menu)
@@ -181,6 +186,15 @@ class MainWindow(QMainWindow):
             self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def show_duplicates(self):
+        """Fenêtre « Doublons » sur les dossiers de l'étape Source."""
+        from .duplicates_dialog import DuplicatesDialog
+
+        dialog = DuplicatesDialog(list(self.state.roots), self.convert_page.workers_spin.value(), self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.show()
+        return dialog
 
     def _fill_slicer_menu(self) -> None:
         """Trancheurs trouvés sur ce PC, choix automatique, ou autre programme : relu à chaque ouverture."""
@@ -332,6 +346,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr("gui.title"))
         self.help_menu.setTitle(tr("gui.menu.help"))
         self.slicer_menu.setTitle(tr("gui.menu.slicer"))
+        self.tools_menu.setTitle(tr("gui.menu.tools"))
+        self.duplicates_action.setText(tr("gui.dupes.action"))
         self.updates_action.setText(tr("gui.update.check"))
         self.project_action.setText(tr("gui.update.project"))
         self.theme_menu.setTitle(tr("gui.menu.theme"))

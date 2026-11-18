@@ -96,3 +96,50 @@ def test_parallel_matches_sequential(collection):
     two = find_duplicates(entries, workers=2, cache_path=None)
     assert [sorted(e.path.name for e in g.files) for g in one.groups] == \
            [sorted(e.path.name for e in g.files) for g in two.groups]
+
+
+def test_cli_lists_groups_and_writes_csv(collection, tmp_path, capsys):
+    import csv
+    import json
+
+    from dracoconv.cli import main
+
+    out_csv = tmp_path / "doublons.csv"
+    assert main(["--lang", "fr", "duplicates", str(collection), "--json", "--csv", str(out_csv), "--workers", "1"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["examined"] == 5 and len(data["groups"]) == 1 and len(data["groups"][0]["files"]) == 4
+    with open(out_csv, encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 4 and {r["group"] for r in rows} == {"1"}
+    assert main(["--lang", "fr", "duplicates", str(collection), "--workers", "1"]) == 0
+    assert "Groupe 1 (même modèle)" in capsys.readouterr().out
+
+
+def test_dialog_search_and_trash_keeps_one_per_group(qtbot, collection, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QMessageBox
+
+    import dracoconv.batch
+    from dracoconv.gui.duplicates_dialog import DuplicatesDialog
+
+    dialog = DuplicatesDialog([collection], workers=1)
+    qtbot.addWidget(dialog)
+    dialog.start()
+    qtbot.waitUntil(lambda: dialog.report is not None, timeout=60_000)
+    assert dialog.tree.topLevelItemCount() == 1
+    head = dialog.tree.topLevelItem(0)
+    assert head.childCount() == 4
+
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args))
+    for c in range(4):
+        head.child(c).setCheckState(0, Qt.CheckState.Checked)
+    assert dialog.trash_checked(confirm=False) == 0 and warnings  # tout cocher est refusé
+
+    trashed = []
+    monkeypatch.setattr("send2trash.send2trash", lambda path: trashed.append(path))
+    monkeypatch.setattr(dracoconv.batch, "recycle_bin_available", lambda path: True)
+    for c in range(2, 4):
+        head.child(c).setCheckState(0, Qt.CheckState.Unchecked)
+    assert dialog.trash_checked(confirm=False) == 2 and len(trashed) == 2
+    assert dialog.tree.topLevelItem(0).childCount() == 2
