@@ -4,7 +4,7 @@
 
 Convertisseur Draco (`.drc`) pour modèles 3D, dans les deux sens, sur un fichier, un dossier ou un disque entier. Avant de convertir, il annonce le gain de place attendu et la perte de qualité selon les réglages.
 
-![Étape « Gain et qualité » : gain de place projeté et écart selon le nombre de bits](docs/images/projection.jpg)
+![Étape « Gain et qualité » : gain de place projeté et écart mesuré selon le nombre de bits](docs/images/fr/projection.png)
 
 Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'ouvrent dans OrcaSlicer, et se reconvertissent en STL pour les logiciels qui ne lisent pas encore Draco.
 
@@ -21,6 +21,21 @@ Pensé pour archiver une collection de modèles d'impression 3D : les `.drc` s'o
 - **3MF : la conversion perd des données** (plateaux, réglages d'impression, couleurs, séparation des objets) et fait rarement gagner de la place, un 3MF étant déjà compressé. Les projets Bambu Studio et OrcaSlicer ne sont pas lus et sont laissés tels quels. Les fichiers `.gcode.3mf` sont ignorés.
 - **Modèles non étanches et OrcaSlicer.** Sur une surface qui n'est pas étanche, l'encodage le plus compact de Draco dédouble certains sommets. Les triangles restent identiques, mais OrcaSlicer y compte alors bien plus d'arêtes ouvertes que dans le STL d'origine. Le réglage **« Préserver la topologie »**, coché par défaut, détecte ces modèles et les encode autrement : cela réduit fortement les écarts de connectivité dans OrcaSlicer, au prix de fichiers plus gros. La lecture directe du Draco peut encore différer légèrement de celle du STL ; le retour en STL a retrouvé exactement les statistiques originales sur les deux modèles vérifiés. Sur une collection de figurines, où presque rien n'est étanche, cela change beaucoup le gain : 30 % de la taille d'origine au lieu de 12 % sur le dossier d'essai. Décochez-le (`--no-keep-topology`) pour une archive la plus compacte possible, à reconvertir en STL avant usage. Détails et chiffres dans [docs/mesures.md](docs/mesures.md).
 - **Au-delà de 22 bits environ, quantifier ne gagne plus en précision** pour un modèle de taille courante : la limite devient celle des nombres du fichier d'origine.
+
+## L'interface en images
+
+| | |
+|---|---|
+| ![Fichiers source : analyse d'un dossier, par type de fichier](docs/images/fr/source.png) | ![Réglages : chaque paramètre de Draco expliqué](docs/images/fr/settings.png) |
+| **1. Fichiers source** : analyse en lecture seule. | **2. Réglages** : chaque paramètre expliqué, commande équivalente. |
+| ![Conversion : plan de conversion avant de lancer](docs/images/fr/convert.png) | ![Journal : résultat de chaque fichier, avant et après](docs/images/fr/journal.png) |
+| **4. Conversion** : le plan, fichier par fichier, avant de lancer. | **5. Journal** : taille avant et après pour chaque fichier. |
+
+![Doublons : fichiers identiques et même modèle sous une autre forme](docs/images/fr/duplicates.png)
+
+**Doublons** (menu « Outils ») : un STL et son `.drc`, des copies téléchargées deux fois, une ancienne conversion.
+
+Captures faites sur des modèles de démonstration générés (`tools/demo_models.py`, `tools/screenshots.py`).
 
 ## Installation
 

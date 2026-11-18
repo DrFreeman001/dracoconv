@@ -1,6 +1,7 @@
 """Recherche des doublons : copies exactes, STL et son .drc, .drc d'autres réglages, variantes à ne pas confondre."""
 import shutil
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -129,6 +130,8 @@ def test_dialog_search_and_trash_keeps_one_per_group(qtbot, collection, monkeypa
     assert dialog.tree.topLevelItemCount() == 1
     head = dialog.tree.topLevelItem(0)
     assert head.childCount() == 4
+    folders = {head.child(c).text(2) for c in range(4)}
+    assert folders == {"collection", str(Path("collection") / "copies")}  # vu depuis le dossier examiné
 
     warnings = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args))

@@ -4,7 +4,7 @@
 
 A Draco (`.drc`) converter for 3D models, both ways, on a file, a folder or a whole drive. Before converting, it tells you how much space you can expect to save and how much quality the chosen settings cost.
 
-!["Gain and quality" step: projected space saving and deviation by number of bits](docs/images/projection.jpg)
+!["Savings and quality" step: projected space saving and measured deviation by number of bits](docs/images/en/projection.png)
 
 Built to archive a collection of 3D-printing models: the `.drc` files open in OrcaSlicer, and convert back to STL for software that does not read Draco yet.
 
@@ -21,6 +21,21 @@ Built to archive a collection of 3D-printing models: the `.drc` files open in Or
 - **3MF: conversion loses data** (plates, print settings, colours, object separation) and rarely saves space, since a 3MF is already compressed. Bambu Studio and OrcaSlicer project files are not read and are left as they are. `.gcode.3mf` files are ignored.
 - **Non-watertight models and OrcaSlicer.** On a surface that is not watertight, Draco's most compact encoding duplicates some vertices. The triangles stay identical, but OrcaSlicer then counts many more open edges than in the original STL. The **"Keep topology"** setting, on by default, detects those models and encodes them differently: this greatly reduces connectivity differences in OrcaSlicer, at the cost of larger files. Reading Draco directly may still differ slightly from reading STL; converting back to STL restored the original statistics exactly on the two models checked. On a collection of figurines, where almost nothing is watertight, this changes the savings a lot: 30% of the original size instead of 12% on the test folder. Turn it off (`--no-keep-topology`) for the most compact archive, to be converted back to STL before use. Details and figures in [docs/mesures.md](docs/mesures.md) (in French).
 - **Beyond about 22 bits, quantizing gains no more precision** for a model of ordinary size: the limit becomes that of the numbers in the original file.
+
+## The interface in pictures
+
+| | |
+|---|---|
+| ![Source files: scanning a folder, by file kind](docs/images/en/source.png) | ![Settings: every Draco setting explained](docs/images/en/settings.png) |
+| **1. Source files**: read-only scan. | **2. Settings**: every setting explained, with the equivalent command. |
+| ![Convert: the conversion plan before starting](docs/images/en/convert.png) | ![Log: result of each file, before and after](docs/images/en/journal.png) |
+| **4. Convert**: the plan, file by file, before starting. | **5. Log**: size before and after for each file. |
+
+![Duplicates: identical files and the same model in another form](docs/images/en/duplicates.png)
+
+**Duplicates** ("Tools" menu): an STL and its `.drc`, copies downloaded twice, an older conversion.
+
+Screenshots taken on generated demo models (`tools/demo_models.py`, `tools/screenshots.py`).
 
 ## Installation
 

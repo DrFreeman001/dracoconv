@@ -264,46 +264,62 @@ def showcase(folder: Path) -> None:
         shutil.copy2(step, folder / "bloc.step")
 
 
-def collection(folder: Path) -> None:
+NAMES = {
+    "fr": {"figurines": "Figurines", "mechanical": "Mécanique", "downloads": "Téléchargements",
+           "archives": "Archives", "knot": "noeud {p}-{q}", "vase": "vase {n}", "ball": "boule lisse",
+           "gear": "engrenage {n} dents", "tower": "tour torsadée", "oring": "joint torique",
+           "colored": "boule colorée", "copy": "noeud 2-3 (1)", "gear_copy": "engrenage-18",
+           "pack": "pack engrenages"},
+    "en": {"figurines": "Figurines", "mechanical": "Mechanical", "downloads": "Downloads",
+           "archives": "Archives", "knot": "knot {p}-{q}", "vase": "vase {n}", "ball": "smooth ball",
+           "gear": "gear {n} teeth", "tower": "twisted tower", "oring": "o-ring", "colored": "colored ball",
+           "copy": "knot 2-3 (1)", "gear_copy": "gear-18", "pack": "gear pack"},
+}
+
+
+def collection(folder: Path, lang: str = "fr") -> None:
     """Une collection plus lourde : figurines lisses, pièces mécaniques, doublons et une ancienne conversion."""
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "Figurines").mkdir(exist_ok=True)
-    (folder / "Mécanique").mkdir(exist_ok=True)
-    (folder / "Téléchargements").mkdir(exist_ok=True)
-    (folder / "Archives").mkdir(exist_ok=True)
+    n = NAMES[lang]
+    figurines, mechanical = folder / n["figurines"], folder / n["mechanical"]
+    downloads, archives = folder / n["downloads"], folder / n["archives"]
+    for sub in (figurines, mechanical, downloads, archives):
+        sub.mkdir(parents=True, exist_ok=True)
     for i, (p, q) in enumerate([(2, 3), (3, 4), (2, 5), (3, 5), (4, 5)]):
         pts, faces = torus_knot(p, q, 24 + 3 * i, 1400, 4.0 + 0.4 * i, 40)
-        write_stl(folder / "Figurines" / f"noeud {p}-{q}.stl", pts, faces)
+        write_stl(figurines / (n["knot"].format(p=p, q=q) + ".stl"), pts, faces)
     for i in range(4):
-        write_stl(folder / "Figurines" / f"vase {i + 1}.stl", *revolve(
+        write_stl(figurines / (n["vase"].format(n=i + 1) + ".stl"), *revolve(
             [(14 + (6 + i) * math.sin(z / 90 * math.pi * (1.2 + 0.3 * i)), z) for z in np.linspace(0, 90, 180)], 360))
-    write_stl(folder / "Figurines" / "boule lisse.stl", *sphere(6, 30.0))
+    write_stl(figurines / (n["ball"] + ".stl"), *sphere(6, 30.0))
     for teeth in (12, 18, 24, 36):
-        write_stl(folder / "Mécanique" / f"engrenage {teeth} dents.stl", *extrude(gear_outline(teeth, teeth * 1.6, 3.0, 16), 10.0, layers=12))
-    write_stl(folder / "Mécanique" / "tour torsadée.stl", *twisted_tower())
+        write_stl(mechanical / (n["gear"].format(n=teeth) + ".stl"),
+                  *extrude(gear_outline(teeth, teeth * 1.6, 3.0, 16), 10.0, layers=12))
+    write_stl(mechanical / (n["tower"] + ".stl"), *twisted_tower())
     pts, faces = torus(30, 9, 360, 120)
-    write_obj(folder / "Mécanique" / "joint torique.obj", pts, faces)
+    write_obj(mechanical / (n["oring"] + ".obj"), pts, faces)
     pts, faces = sphere(5, 20.0)
-    write_ply(folder / "Figurines" / "boule colorée.ply", pts, faces, rainbow(pts))
+    write_ply(figurines / (n["colored"] + ".ply"), pts, faces, rainbow(pts))
     # Doublons : une copie téléchargée deux fois, et un modèle déjà converti par une ancienne version.
-    shutil.copy2(folder / "Figurines" / "noeud 2-3.stl", folder / "Téléchargements" / "noeud 2-3 (1).stl")
-    shutil.copy2(folder / "Mécanique" / "engrenage 18 dents.stl", folder / "Téléchargements" / "engrenage-18.stl")
+    shutil.copy2(figurines / (n["knot"].format(p=2, q=3) + ".stl"), downloads / (n["copy"] + ".stl"))
+    shutil.copy2(mechanical / (n["gear"].format(n=18) + ".stl"), downloads / (n["gear_copy"] + ".stl"))
     pts, faces = revolve([(14 + 6 * math.sin(z / 90 * math.pi * 1.2), z) for z in np.linspace(0, 90, 180)], 360)
-    (folder / "Archives" / "vase 1.drc").write_bytes(encode_drc(pts, faces, position_bits=14))
+    (archives / (n["vase"].format(n=1) + ".drc")).write_bytes(encode_drc(pts, faces, position_bits=14))
     buffer = io.BytesIO()
+    gear24 = n["gear"].format(n=24) + ".stl"
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(folder / "Mécanique" / "engrenage 24 dents.stl", "engrenage 24 dents.stl")
-    (folder / "Téléchargements" / "pack engrenages.zip").write_bytes(buffer.getvalue())
+        z.write(mechanical / gear24, gear24)
+    (downloads / (n["pack"] + ".zip")).write_bytes(buffer.getvalue())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path)
     parser.add_argument("--collection", action="store_true")
+    parser.add_argument("--lang", choices=("fr", "en"), default="fr")
     args = parser.parse_args()
     showcase(args.folder / "Vitrine")
     if args.collection:
-        collection(args.folder / "Collection")
+        collection(args.folder / "Collection", args.lang)
 
 
 if __name__ == "__main__":

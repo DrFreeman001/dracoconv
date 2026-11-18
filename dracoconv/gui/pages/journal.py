@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from ...batch import Journal
 from ...i18n import format_size, reason_text, tr
+from ..tables import paths_first
 
 _FILTERS = (None, "done", "skipped", "failed", "pending")
 _MAX_ROWS = 2000
@@ -38,7 +39,7 @@ class JournalPage(QWidget):
         top.addWidget(self.export_button)
         self.table = QTableWidget(0, 6)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        paths_first(self.table, path_columns=2)
         self.table.verticalHeader().hide()
         layout = QVBoxLayout(self)
         layout.addWidget(self.summary_label)

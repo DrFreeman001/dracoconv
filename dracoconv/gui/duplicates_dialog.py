@@ -158,7 +158,8 @@ class DuplicatesDialog(QDialog):
                                        size=format_size(group.recoverable)), "", ""])
             head.setFirstColumnSpanned(True)
             for entry in group.files:
-                child = QTreeWidgetItem([entry.path.name, format_size(entry.size), str(entry.path.parent)])
+                child = QTreeWidgetItem([entry.path.name, format_size(entry.size), self._folder_text(entry.path)])
+                child.setToolTip(2, str(entry.path.parent))
                 child.setData(0, _PATH_ROLE, str(entry.path))
                 child.setCheckState(0, Qt.CheckState.Unchecked)
                 child.setTextAlignment(1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -166,6 +167,18 @@ class DuplicatesDialog(QDialog):
             self.tree.addTopLevelItem(head)
             head.setExpanded(True)
             head.setFirstColumnSpanned(True)
+
+    def _folder_text(self, path: Path) -> str:
+        """Dossier du fichier vu depuis le dossier examiné (« Modèles 3D\\Figurines ») ; chemin complet sinon."""
+        parent = path.parent
+        for root in self.roots:
+            try:
+                relative = parent.relative_to(root)
+            except ValueError:
+                continue
+            name = root.name or str(root)
+            return name if str(relative) == "." else str(Path(name) / relative)
+        return str(parent)
 
     # -- actions ---------------------------------------------------------------------------------
 

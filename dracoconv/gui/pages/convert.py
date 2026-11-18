@@ -20,6 +20,7 @@ from ...settings import EncodeSettings
 from ..state import AppState
 from ..workers import Worker
 from ..activity import ActivityBar
+from ..tables import paths_first
 
 _MODES = ("keep", "mirror", "replace")
 _FORMATS = ("stl", "obj", "ply")
@@ -83,7 +84,7 @@ class ConvertPage(QWidget):
         self.warning_label.setStyleSheet("color: #b45309; font-weight: 600;")
         self.plan_table = QTableWidget(0, 4)
         self.plan_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.plan_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        paths_first(self.plan_table, path_columns=2)
         self.plan_table.verticalHeader().hide()
         plan_layout = QVBoxLayout(self.plan_group)
         plan_layout.addWidget(self.plan_label)
