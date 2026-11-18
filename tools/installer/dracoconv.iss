@@ -44,11 +44,13 @@ fr.CommandLine=dracoconv (ligne de commande)
 fr.MenuEncode=Convertir en .drc avec dracoconv
 fr.MenuDecode=Convertir depuis .drc avec dracoconv
 fr.MenuFolder=Convertir avec dracoconv
+fr.MenuSlicer=Ouvrir dans le trancheur
 fr.ContextMenu=Ajouter « Convertir avec dracoconv » au clic droit de l'Explorateur
 en.CommandLine=dracoconv (command line)
 en.MenuEncode=Convert to .drc with dracoconv
 en.MenuDecode=Convert from .drc with dracoconv
 en.MenuFolder=Convert with dracoconv
+en.MenuSlicer=Open in slicer
 en.ContextMenu=Add "Convert with dracoconv" to the Explorer right-click menu
 
 [Tasks]
@@ -92,6 +94,12 @@ Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv
 Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.decode\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --decode ""%1"""; Tasks: contextmenu
+; « Ouvrir dans le trancheur » : décode en STL temporaires et ouvre toute la sélection dans le trancheur choisi
+; (menu « Trancheur » de dracoconv), sans fenêtre de dracoconv (dracoconv/gui/slicer_open.py).
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.slicer"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuSlicer}"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.slicer"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.slicer"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.drc\shell\dracoconv.slicer\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dracoconv-gui.exe"" --slicer ""%1"""; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: ""; ValueData: "{cm:MenuFolder}"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\dracoconv-gui.exe"; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\shell\dracoconv"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Tasks: contextmenu

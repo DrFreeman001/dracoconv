@@ -359,5 +359,17 @@
   "gui.notify.finished": "dracoconv: batch finished",
   "gui.notify.paused": "dracoconv: batch paused",
   "gui.notify.body": "{done} files processed, {failed} failed, {skipped} skipped.",
-  "gui.notify.saved": "Space saved: {size}."
+  "gui.notify.saved": "Space saved: {size}.",
+  "gui.menu.slicer": "Slicer",
+  "gui.slicer.auto": "Automatic ({name})",
+  "gui.slicer.auto_none": "Automatic (no slicer found)",
+  "gui.slicer.other": "Other program…",
+  "gui.slicer.pick": "Choose the slicer program",
+  "gui.slicer.programs": "Programs",
+  "gui.slicer.hint": "Right-click .drc files: \"Open in slicer\"",
+  "slicer.title": "dracoconv: open in slicer",
+  "slicer.none": "No slicer found (Bambu Studio, OrcaSlicer or PrusaSlicer).\n\nOpen dracoconv and choose the program in the \"Slicer\" menu.",
+  "slicer.launch_failed": "Could not start {name}: {error}",
+  "slicer.failed": "{n} file(s) could not be opened:\n{details}",
+  "reason.not_draco": "not a .drc file"
 }

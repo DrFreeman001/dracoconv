@@ -90,6 +90,10 @@ Five steps:
 
 **Right-click in Explorer** (with the installer, option checked by default): "Convert to .drc with dracoconv" on STL, OBJ, PLY and 3MF files, "Convert from .drc" on `.drc` files, "Convert with dracoconv" on a folder. On Windows 11 these are under "Show more options". Selecting several files opens a single window, already scanned; nothing is converted until you confirm. From the command line: `dracoconv-gui [--encode|--decode] paths...`.
 
+**Open a .drc in your slicer**: Bambu Studio, OrcaSlicer and PrusaSlicer cannot read Draco. Right-click one or more `.drc` files, "Open in slicer": dracoconv decodes them to temporary STL files (checked, deleted after two days) and opens the whole selection in a single slicer window. Pick the slicer in dracoconv's "Slicer" menu; by default, the first one found. Command line: `dracoconv-gui --slicer files.drc...`.
+
+**Drag and drop**: files or folders dropped on the window are added as with "Add". During a batch, the taskbar icon shows the progress, and a Windows notification reports the end when the window is not in front.
+
 The **Help** menu links to the project page and controls the new-version notice: at most one check a day on GitHub, sending nothing but the request; uncheck it to stop.
 
 The language is changed from the menu, without restarting. The **Appearance** menu offers **System**, **Light**, and **Dark**, and remembers the choice.

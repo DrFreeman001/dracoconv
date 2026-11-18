@@ -304,6 +304,23 @@ def test_taskbar_progress_and_notification(qtbot, window, monkeypatch):
     window._batch_progress(2, 4)
 
 
+def test_slicer_menu_lists_found_and_saves_choice(qtbot, window, tmp_path, monkeypatch):
+    from dracoconv import slicer
+
+    exe = tmp_path / "orca-slicer.exe"
+    exe.write_bytes(b"MZ")
+    monkeypatch.setattr(slicer, "find_slicers", lambda: {"orca": exe})
+    window._fill_slicer_menu()
+    texts = [a.text() for a in window.slicer_menu.actions() if a.text()]
+    assert texts[0] == tr("gui.slicer.auto", name="OrcaSlicer") and "OrcaSlicer" in texts
+    assert tr("gui.slicer.other") in texts
+    orca = next(a for a in window.slicer_menu.actions() if a.text() == "OrcaSlicer")
+    orca.trigger()
+    assert slicer.chosen() == ("OrcaSlicer", exe)
+    window._fill_slicer_menu()
+    assert next(a for a in window.slicer_menu.actions() if a.text() == "OrcaSlicer").isChecked()
+
+
 def test_second_launch_forwards_to_the_first(tmp_path):
     import uuid
     from pathlib import Path

@@ -90,6 +90,10 @@ Cinq étapes :
 
 **Clic droit dans l'Explorateur** (avec l'installateur, option cochée par défaut) : « Convertir en .drc avec dracoconv » sur les STL, OBJ, PLY et 3MF, « Convertir depuis .drc » sur les `.drc`, « Convertir avec dracoconv » sur un dossier. Sous Windows 11, ces entrées sont dans « Afficher plus d'options ». Une sélection de plusieurs fichiers ouvre une seule fenêtre, déjà analysée ; rien n'est converti avant votre confirmation. En ligne de commande : `dracoconv-gui [--encode|--decode] chemins...`.
 
+**Ouvrir un .drc dans le trancheur** : Bambu Studio, OrcaSlicer et PrusaSlicer ne lisent pas le Draco. Clic droit sur un ou plusieurs `.drc`, « Ouvrir dans le trancheur » : dracoconv les décode en STL temporaires (vérifiés, effacés après deux jours) et ouvre toute la sélection dans une seule fenêtre du trancheur. Le trancheur se choisit dans le menu « Trancheur » de dracoconv ; par défaut, le premier trouvé. Ligne de commande : `dracoconv-gui --slicer fichiers.drc...`.
+
+**Glisser-déposer** : des fichiers ou dossiers lâchés sur la fenêtre sont ajoutés comme avec « Ajouter ». Pendant un lot, l'icône de la barre des tâches montre l'avancement, et une notification Windows signale la fin si la fenêtre n'est pas au premier plan.
+
 Le menu **Aide** mène à la page du projet et règle l'avis de nouvelle version : au plus une vérification par jour sur GitHub, sans rien envoyer d'autre que la requête ; décochez-le pour ne plus rien demander.
 
 La langue se change dans le menu, sans redémarrer. Le menu **Apparence** permet de choisir **Système**, **Clair** ou **Sombre** ; le choix est mémorisé.

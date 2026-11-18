@@ -6,11 +6,19 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
-    """dracoconv-gui [--encode|--decode] [chemins...]"""
+    """dracoconv-gui [--encode|--decode|--slicer] [chemins...]"""
     multiprocessing.freeze_support()
     from .launch import claim_or_forward, parse
 
     direction, paths = parse(sys.argv[1:] if argv is None else argv)
+    if direction == "slicer":
+        from ..config import load_prefs
+        from ..i18n import LANGUAGES, set_language, system_language
+        from .slicer_open import run
+
+        language = load_prefs().get("language")
+        set_language(language if language in LANGUAGES else system_language())
+        return run(paths)
     channel = claim_or_forward(direction, paths)
     if channel is True:  # une fenêtre déjà ouverte a reçu les chemins
         return 0

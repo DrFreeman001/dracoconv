@@ -104,6 +104,10 @@ class MainWindow(QMainWindow):
         QApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self.set_theme(load_prefs().get("theme", "system"), persist=False)
 
+        # Trancheur utilisé par le clic droit « Ouvrir dans le trancheur » sur les .drc.
+        self.slicer_menu = self.menuBar().addMenu("")
+        self.slicer_menu.aboutToShow.connect(self._fill_slicer_menu)
+
         from .. import updates
 
         self.help_menu = self.menuBar().addMenu("")
@@ -177,6 +181,49 @@ class MainWindow(QMainWindow):
             self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def _fill_slicer_menu(self) -> None:
+        """Trancheurs trouvés sur ce PC, choix automatique, ou autre programme : relu à chaque ouverture."""
+        from .. import slicer
+
+        menu = self.slicer_menu
+        menu.clear()
+        group = QActionGroup(menu)
+        pref = load_prefs().get("slicer") or ""
+        found = slicer.find_slicers()
+        current = slicer.chosen()
+
+        def add(text: str, value, checked: bool) -> None:
+            action = QAction(text, menu, checkable=True)
+            action.setChecked(checked)
+            action.triggered.connect(lambda _checked=False, value=value: slicer.choose(value))
+            group.addAction(action)
+            menu.addAction(action)
+
+        auto_name = current[0] if current and not pref else (
+            next((slicer.label(exe) for exe in found.values()), None))
+        add(tr("gui.slicer.auto", name=auto_name) if auto_name else tr("gui.slicer.auto_none"), None, not pref)
+        paths = {str(exe).lower() for exe in found.values()}
+        for exe in found.values():
+            add(slicer.label(exe), exe, pref.lower() == str(exe).lower())
+        if pref and pref.lower() not in paths:
+            add(Path(pref).stem, pref, True)
+        menu.addSeparator()
+        other = QAction(tr("gui.slicer.other"), menu)
+        other.triggered.connect(self._pick_slicer)
+        menu.addAction(other)
+        hint = QAction(tr("gui.slicer.hint"), menu)
+        hint.setEnabled(False)
+        menu.addAction(hint)
+
+    def _pick_slicer(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+
+        from .. import slicer
+
+        path, _ = QFileDialog.getOpenFileName(self, tr("gui.slicer.pick"), "", tr("gui.slicer.programs") + " (*.exe)")
+        if path:
+            slicer.choose(path)
 
     def _batch_progress(self, done: int, total: int) -> None:
         hwnd = int(self.winId())
@@ -284,6 +331,7 @@ class MainWindow(QMainWindow):
     def retranslate(self) -> None:
         self.setWindowTitle(tr("gui.title"))
         self.help_menu.setTitle(tr("gui.menu.help"))
+        self.slicer_menu.setTitle(tr("gui.menu.slicer"))
         self.updates_action.setText(tr("gui.update.check"))
         self.project_action.setText(tr("gui.update.project"))
         self.theme_menu.setTitle(tr("gui.menu.theme"))

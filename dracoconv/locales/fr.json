@@ -359,5 +359,17 @@
   "gui.notify.finished": "dracoconv : lot terminé",
   "gui.notify.paused": "dracoconv : lot en pause",
   "gui.notify.body": "{done} fichiers traités, {failed} en échec, {skipped} ignorés.",
-  "gui.notify.saved": "Place gagnée : {size}."
+  "gui.notify.saved": "Place gagnée : {size}.",
+  "gui.menu.slicer": "Trancheur",
+  "gui.slicer.auto": "Automatique ({name})",
+  "gui.slicer.auto_none": "Automatique (aucun trancheur trouvé)",
+  "gui.slicer.other": "Autre programme…",
+  "gui.slicer.pick": "Choisir le programme du trancheur",
+  "gui.slicer.programs": "Programmes",
+  "gui.slicer.hint": "Clic droit sur des .drc : « Ouvrir dans le trancheur »",
+  "slicer.title": "dracoconv : ouvrir dans le trancheur",
+  "slicer.none": "Aucun trancheur trouvé (Bambu Studio, OrcaSlicer ou PrusaSlicer).\n\nOuvrez dracoconv et choisissez le programme dans le menu « Trancheur ».",
+  "slicer.launch_failed": "Impossible de lancer {name} : {error}",
+  "slicer.failed": "{n} fichier(s) n'ont pas pu être ouverts :\n{details}",
+  "reason.not_draco": "ce n'est pas un fichier .drc"
 }

@@ -16,14 +16,16 @@ from multiprocessing.connection import Client, Listener
 from pathlib import Path
 
 DIRECTIONS = ("encode", "decode")
+#: Demande d'ouverture dans le trancheur (clic droit sur des .drc), sans fenêtre de dracoconv.
+SLICER = "slicer"
 _DRACO = ".drc"
 
 
 def parse(argv: list[str]) -> tuple[str | None, list[Path]]:
-    """Lit « [--encode|--decode] chemins... » ; le sens est None s'il n'est pas donné."""
+    """Lit « [--encode|--decode|--slicer] chemins... » ; le sens est None s'il n'est pas donné."""
     direction, paths = None, []
     for arg in argv:
-        if arg in ("--encode", "--decode"):
+        if arg in ("--encode", "--decode", "--slicer"):
             direction = arg[2:]
         elif arg:
             paths.append(Path(arg))
@@ -32,13 +34,15 @@ def parse(argv: list[str]) -> tuple[str | None, list[Path]]:
 
 def infer_direction(paths: list[Path]) -> str:
     """Décoder seulement si tous les chemins sont des fichiers .drc ; sinon encoder."""
+    paths = [Path(p) for p in paths]
     files = [p for p in paths if p.suffix.lower() == _DRACO]
     return "decode" if paths and len(files) == len(paths) else "encode"
 
 
-def _names() -> tuple[str, str, bytes]:
+def _names(kind: str = "gui") -> tuple[str, str, bytes]:
     user = hashlib.sha256(getpass.getuser().encode("utf-8")).hexdigest()[:16]
-    return f"Local\\dracoconv-gui-{user}", rf"\\.\pipe\dracoconv-gui-{user}", f"dracoconv-{user}".encode()
+    key = f"dracoconv-{user}" if kind == "gui" else f"dracoconv-{kind}-{user}"
+    return f"Local\\dracoconv-{kind}-{user}", rf"\\.\pipe\dracoconv-{kind}-{user}", key.encode()
 
 
 class Channel:
@@ -55,7 +59,7 @@ class Channel:
             try:
                 with self._listener.accept() as connection:
                     direction, paths = connection.recv()
-                    if direction in DIRECTIONS or direction is None:
+                    if direction in DIRECTIONS or direction in (None, SLICER):
                         self.requests.put((direction, [Path(p) for p in paths]))
             except (OSError, EOFError, ValueError, TypeError, AuthenticationError):
                 time.sleep(0.05)
@@ -74,10 +78,12 @@ def forward(address: str, authkey: bytes, direction: str | None, paths: list[Pat
         return False
 
 
-def claim_or_forward(direction: str | None, paths: list[Path], wait_s: float = 15.0) -> Channel | None | bool:
+def claim_or_forward(direction: str | None, paths: list[Path], wait_s: float = 15.0,
+                     kind: str = "gui") -> Channel | None | bool:
     """Devient la fenêtre principale (renvoie un Channel), ou transmet à elle (renvoie True).
 
     Sans chemins, ou hors Windows, renvoie None : la fenêtre s'ouvre normalement, sans coordination.
+    ``kind`` sépare les canaux : la fenêtre (« gui ») et l'ouverture dans le trancheur (« slicer »).
     """
     if not paths or os.name != "nt":
         return None
@@ -87,7 +93,7 @@ def claim_or_forward(direction: str | None, paths: list[Path], wait_s: float = 1
     kernel.CreateMutexW.restype = ctypes.c_void_p
     kernel.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
     kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-    mutex_name, address, authkey = _names()
+    mutex_name, address, authkey = _names(kind)
     mutex = kernel.CreateMutexW(None, False, mutex_name)
     if not mutex:
         return None
