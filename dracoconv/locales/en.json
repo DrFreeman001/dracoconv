@@ -355,5 +355,9 @@
   "gui.menu.help": "Help",
   "gui.update.check": "Tell me about new versions (one check a day)",
   "gui.update.project": "Project page on GitHub",
-  "gui.update.available": "New version {version} available"
+  "gui.update.available": "New version {version} available",
+  "gui.notify.finished": "dracoconv: batch finished",
+  "gui.notify.paused": "dracoconv: batch paused",
+  "gui.notify.body": "{done} files processed, {failed} failed, {skipped} skipped.",
+  "gui.notify.saved": "Space saved: {size}."
 }

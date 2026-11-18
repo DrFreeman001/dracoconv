@@ -355,5 +355,9 @@
   "gui.menu.help": "Aide",
   "gui.update.check": "Signaler les nouvelles versions (une vérification par jour)",
   "gui.update.project": "Page du projet sur GitHub",
-  "gui.update.available": "Nouvelle version {version} disponible"
+  "gui.update.available": "Nouvelle version {version} disponible",
+  "gui.notify.finished": "dracoconv : lot terminé",
+  "gui.notify.paused": "dracoconv : lot en pause",
+  "gui.notify.body": "{done} fichiers traités, {failed} en échec, {skipped} ignorés.",
+  "gui.notify.saved": "Place gagnée : {size}."
 }

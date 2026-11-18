@@ -1,18 +1,21 @@
 """Fenêtre principale : cinq étapes, changement de langue sans redémarrage."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal
+from PySide6.QtCore import QFileInfo, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtWidgets import (
     QLabel,
-    QApplication, QHBoxLayout, QListWidget, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QFileIconProvider, QHBoxLayout, QListWidget, QMainWindow, QPushButton, QStackedWidget, QStyle,
+    QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
 from ..config import load_prefs, save_prefs
+from .taskbar import TaskbarProgress
 from .theme import THEMES, apply_theme
-from ..i18n import get_language, set_language, tr
+from ..i18n import format_size, get_language, set_language, tr
 from .pages.convert import ConvertPage
 from .pages.journal import JournalPage
 from .pages.projection import ProjectionPage
@@ -128,6 +131,9 @@ class MainWindow(QMainWindow):
         self.projection_page.quality_ready.connect(
             lambda _q: self.settings_page.set_reference_extent(self.state.reference_extent))
         self.convert_page.journal_changed.connect(self.journal_page.load)
+        self._taskbar = TaskbarProgress()
+        self.convert_page.progressed.connect(self._batch_progress)
+        self.convert_page.finished.connect(self._batch_finished)
         self.journal_page.retry_requested.connect(self.convert_page.retry_failed)
 
         self.steps.setCurrentRow(0)
@@ -167,6 +173,47 @@ class MainWindow(QMainWindow):
             return
         self.steps.setCurrentRow(0)
         self.source_page.open_paths(paths, direction or infer_direction(paths))
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _batch_progress(self, done: int, total: int) -> None:
+        hwnd = int(self.winId())
+        if done < 0:
+            self._taskbar.clear(hwnd)
+        else:
+            self._taskbar.set_value(hwnd, done, total)
+
+    def _batch_finished(self, summary: dict) -> None:
+        self._taskbar.clear(int(self.winId()))
+        if not self.isActiveWindow():
+            self._notify(summary)
+
+    def _notify(self, summary: dict) -> None:
+        """Notification Windows de fin de lot, quand la fenêtre n'est pas au premier plan."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        icon = QFileIconProvider().icon(QFileInfo(sys.executable))
+        if icon.isNull():
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)
+        title = tr("gui.notify.paused" if summary.get("paused") else "gui.notify.finished")
+        body = tr("gui.notify.body", done=summary.get("done", 0), failed=summary.get("failed", 0),
+                  skipped=summary.get("skipped", 0))
+        saved = summary.get("bytes_before", 0) - summary.get("bytes_after", 0)
+        if saved > 0:
+            body += " " + tr("gui.notify.saved", size=format_size(saved))
+        tray = QSystemTrayIcon(icon, self)
+        tray.setToolTip("dracoconv")
+        tray.messageClicked.connect(self._bring_to_front)
+        tray.activated.connect(lambda _reason: self._bring_to_front())
+        tray.show()
+        tray.showMessage(title, body, QSystemTrayIcon.MessageIcon.Information, 10_000)
+        self._last_notification = (title, body)
+        # L'icône ne sert qu'à porter la notification : elle disparaît ensuite.
+        QTimer.singleShot(20_000, tray.deleteLater)
+
+    def _bring_to_front(self) -> None:
         if self.isMinimized():
             self.showNormal()
         self.raise_()

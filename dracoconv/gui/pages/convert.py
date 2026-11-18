@@ -29,6 +29,8 @@ _MAX_PLAN_ROWS = 500
 class ConvertPage(QWidget):
     finished = Signal(object)
     journal_changed = Signal(object)
+    #: (fichiers traités, total) à chaque fichier d'un lot en cours ; (-1, 0) si le lot s'arrête sur une erreur.
+    progressed = Signal(int, int)
 
     def __init__(self, state: AppState, get_settings: Callable[[], EncodeSettings],
                  get_engine: Callable[[], str | None], parent: QWidget | None = None):
@@ -251,6 +253,7 @@ class ConvertPage(QWidget):
         self._update_buttons()
         self._worker.start()
         self._update_buttons()
+        self.progressed.emit(0, total)
 
     def request_stop(self) -> None:
         if self._worker is not None:
@@ -260,6 +263,7 @@ class ConvertPage(QWidget):
         self._done += 1
         self.progress.setValue(self._done)
         self._set_status("gui.convert.running", done=self._done, total=total)
+        self.progressed.emit(self._done, total)
 
     def _on_finished(self, summary: dict) -> None:
         self.activity.stop()
@@ -278,6 +282,7 @@ class ConvertPage(QWidget):
         self._worker = None
         self.status_label.setText(message)
         self._update_buttons()
+        self.progressed.emit(-1, 0)
 
     def _set_status(self, key: str, **values) -> None:
         self._status = (key, values)

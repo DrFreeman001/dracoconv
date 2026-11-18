@@ -147,10 +147,13 @@ def test_full_conversion_from_window(qtbot, scanned_window, model_tree):
     w = scanned_window
     c = w.convert_page
     c.refresh_plan()
+    steps = []
+    c.progressed.connect(lambda done, total: steps.append((done, total)))
     with qtbot.waitSignal(c.finished, timeout=120_000) as sig:
         c.start_button.click()
     summary = sig.args[0]
     assert summary["done"] == 5 and summary["failed"] == 0 and (model_tree / "a.drc").exists()
+    assert steps[0] == (0, 5) and steps[-1] == (5, 5)  # avancement de la barre des tâches
     assert w.journal_page.table.rowCount() == summary["total"] == 5
     assert "5" in w.journal_page.summary_label.text() and not c.stop_button.isEnabled()
     assert not c.start_button.isEnabled()  # tout est déjà converti : plus rien à lancer
@@ -275,6 +278,30 @@ def test_drop_on_window_adds_paths(qtbot, window, model_tree):
     assert len(window.source_page.state.roots) == 1
     with qtbot.waitSignal(window.source_page.scanned, timeout=20_000):
         pass
+
+
+def test_taskbar_progress_and_notification(qtbot, window, monkeypatch):
+    from PySide6.QtWidgets import QSystemTrayIcon
+
+    from dracoconv.gui.taskbar import ERROR, TaskbarProgress
+
+    window.show()
+    hwnd = int(window.winId())
+    bar = TaskbarProgress()
+    bar.set_value(hwnd, 3, 10)  # ne doit rien lever, même sans barre des tâches
+    bar.set_state(hwnd, ERROR)
+    bar.clear(hwnd)
+
+    shown = []
+    monkeypatch.setattr(QSystemTrayIcon, "showMessage", lambda self, *args: shown.append(args))
+    window._notify({"done": 3, "failed": 1, "skipped": 2, "bytes_before": 3 << 20, "bytes_after": 1 << 20})
+    if QSystemTrayIcon.isSystemTrayAvailable():
+        title, body = shown[0][:2]
+        assert title == tr("gui.notify.finished")
+        assert "3" in body and "1" in body and "2" in body
+        assert tr("gui.notify.saved", size="").split(":")[0] in body
+    window._batch_progress(-1, 0)
+    window._batch_progress(2, 4)
 
 
 def test_second_launch_forwards_to_the_first(tmp_path):
